@@ -3,8 +3,8 @@ package devices_test
 import (
 	"testing"
 
-	"github.com/go-rod/rod/lib/devices"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/lib/devices"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 func TestErr(t *testing.T) {

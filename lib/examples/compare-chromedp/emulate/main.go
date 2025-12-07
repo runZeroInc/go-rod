@@ -2,8 +2,8 @@
 package main
 
 import (
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/devices"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/lib/devices"
 )
 
 func main() {

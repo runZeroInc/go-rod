@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/go-rod/rod"
+	"github.com/runZeroInc/go-rod"
 )
 
 // This example demonstrates how to set a HTTP header on requests.

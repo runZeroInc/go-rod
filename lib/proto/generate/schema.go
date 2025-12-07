@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 type objType int

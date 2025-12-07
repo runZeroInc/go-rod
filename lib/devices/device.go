@@ -2,8 +2,8 @@
 package devices
 
 import (
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 // Device represents a emulated device.

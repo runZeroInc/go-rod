@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 func patch(json gson.JSON) {

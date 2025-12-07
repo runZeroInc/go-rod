@@ -4,7 +4,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-rod/rod"
+	"github.com/runZeroInc/go-rod"
 )
 
 func main() {

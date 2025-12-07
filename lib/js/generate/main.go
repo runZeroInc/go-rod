@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 func main() {

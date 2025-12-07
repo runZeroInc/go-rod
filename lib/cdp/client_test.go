@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/cdp"
-	"github.com/go-rod/rod/lib/defaults"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/got"
-	"github.com/ysmood/gotrace"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/lib/cdp"
+	"github.com/runZeroInc/go-rod/lib/defaults"
+	"github.com/runZeroInc/go-rod/lib/launcher"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/internal/gotrace"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 var setup = got.Setup(nil)

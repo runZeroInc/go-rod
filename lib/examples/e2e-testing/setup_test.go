@@ -5,8 +5,8 @@ package main
 import (
 	"testing"
 
-	"github.com/go-rod/rod"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 // test context.

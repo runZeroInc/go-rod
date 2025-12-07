@@ -124,7 +124,7 @@ Because parallel execution will pollution the global goroutine stack, by default
 
 Run `go mod vendor` to create a local mirror of dependencies.
 The Golang compiler will use the libs under `vendor` folder as a priority.
-For example, we can modify file `./vendor/github.com/ysmood/goob/goob.go` to debug, such as add some extra logs.
+For example, we can modify file `./vendor/github.com/runZeroInc/go-rod/pkg/internal/goob/goob.go` to debug, such as add some extra logs.
 
 ## Comments
 

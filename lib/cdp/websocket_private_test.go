@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 var setup = got.Setup(nil)

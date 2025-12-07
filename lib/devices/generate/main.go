@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 func main() {
@@ -66,7 +66,7 @@ func main() {
 
 	utils.Exec("gofumpt -w", path)
 	utils.Exec(
-		"go run github.com/ysmood/golangci-lint@latest -- "+
+		"go run github.com/runZeroInc/go-rod/pkg/internal/golangci-lint@latest -- "+
 			"run --fix",
 		filepath.Dir(path),
 	)

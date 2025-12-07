@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-rod/rod/lib/cdp"
-	"github.com/go-rod/rod/lib/devices"
-	"github.com/go-rod/rod/lib/js"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/goob"
-	"github.com/ysmood/got/lib/lcs"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/lib/cdp"
+	"github.com/runZeroInc/go-rod/lib/devices"
+	"github.com/runZeroInc/go-rod/lib/js"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/goob"
+	"github.com/runZeroInc/go-rod/pkg/internal/got/lib/lcs"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 // Page implements these interfaces.

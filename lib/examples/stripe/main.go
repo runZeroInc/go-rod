@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-rod/rod"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 // An example to handle stripe 3DS callback.

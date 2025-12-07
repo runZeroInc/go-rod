@@ -1,0 +1,2 @@
+mode: atomic
+github.com/runZeroInc/go-rod/pkg/internal/got/fixtures/coverage/foo.go:4.16,6.2 1 1

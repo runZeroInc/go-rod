@@ -4,8 +4,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-rod/rod"
-	"github.com/ysmood/gotrace"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/pkg/internal/gotrace"
 )
 
 // This example shows how to detect the hanging points of golang code.
@@ -27,7 +27,7 @@ func yourCodeHere() {
 
 /*
 goroutine 7 [select]:
-github.com/go-rod/rod.(*Page).MustElement(0xc00037e000, 0xc00063a0f0, 0x1, 0x1, 0x0)
+github.com/runZeroInc/go-rod.(*Page).MustElement(0xc00037e000, 0xc00063a0f0, 0x1, 0x1, 0x0)
 	rod/must.go:425 +0x4d
 created by main.yourCodeHere
 	rod/lib/examples/debug-deadlock/main.go:22 +0xb8

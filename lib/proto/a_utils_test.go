@@ -3,8 +3,8 @@ package proto_test
 import (
 	"testing"
 
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 type T struct {

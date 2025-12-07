@@ -16,11 +16,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-rod/rod/lib/defaults"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/launcher/flags"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/lib/defaults"
+	"github.com/runZeroInc/go-rod/lib/launcher"
+	"github.com/runZeroInc/go-rod/lib/launcher/flags"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 var setup = got.Setup(nil)

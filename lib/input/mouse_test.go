@@ -3,9 +3,9 @@ package input_test
 import (
 	"testing"
 
-	"github.com/go-rod/rod/lib/input"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/lib/input"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 func TestMouseEncode(t *testing.T) {

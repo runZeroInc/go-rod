@@ -1,0 +1,29 @@
+name: Example
+
+on: [push]
+
+env:
+  GODEBUG: tracebackancestors=1000
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: lib/example
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+
+      - name: lint
+        run: go run github.com/runZeroInc/go-rod/pkg/internal/golangci-lint@latest -v 1.59.1
+
+      - name: test
+        run: |
+          go test -race -coverprofile=coverage.out ./...
+          go run github.com/runZeroInc/go-rod/pkg/internal/got/cmd/check-cov@latest

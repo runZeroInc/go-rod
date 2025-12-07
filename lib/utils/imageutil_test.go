@@ -5,8 +5,8 @@ import (
 	"image"
 	"testing"
 
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 var setup = got.Setup(nil)

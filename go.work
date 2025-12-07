@@ -1,8 +1,15 @@
-go 1.22
+go 1.25
 
 use (
-	.
+	./
 	./lib/examples/custom-websocket
 	./lib/examples/e2e-testing
 	./lib/utils/check-issue
+	./pkg/internal/fetchup
+	./pkg/internal/goob
+	./pkg/internal/gop
+	./pkg/internal/got
+	./pkg/internal/gotrace
+	./pkg/internal/gson
+	./pkg/internal/leakless
 )

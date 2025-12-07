@@ -1,8 +1,8 @@
 # A docker image for rod development.
 # To build the image:
-#     docker build -t ghcr.io/go-rod/rod:dev -f lib/docker/dev.Dockerfile .
+#     docker build -t ghcr.io/runZeroInc/go-rod:dev -f lib/docker/dev.Dockerfile .
 
-FROM ghcr.io/go-rod/rod
+FROM ghcr.io/runZeroInc/go-rod
 
 ARG nodejs
 ARG golang

@@ -13,10 +13,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/go-rod/rod/lib/defaults"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/fetchup"
-	"github.com/ysmood/leakless"
+	"github.com/runZeroInc/go-rod/lib/defaults"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/fetchup"
+	"github.com/runZeroInc/go-rod/pkg/internal/leakless"
 )
 
 // Host formats a revision number to a downloadable URL for the browser.

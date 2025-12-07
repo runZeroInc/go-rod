@@ -23,7 +23,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 // TestEnvs for testing.
@@ -326,7 +326,7 @@ func ExecLine(std bool, line string, rest ...string) string {
 
 // UseNode installs Node.js and set the bin path to PATH env var.
 func UseNode(std bool) {
-	binPath := strings.TrimSpace(ExecLine(std, "go run github.com/ysmood/use-node@latest -p v20"))
+	binPath := strings.TrimSpace(ExecLine(std, "go run github.com/runZeroInc/go-rod/pkg/internal/use-node@latest -p v20"))
 	E(os.Setenv("PATH", binPath+string(os.PathListSeparator)+os.Getenv("PATH")))
 }
 

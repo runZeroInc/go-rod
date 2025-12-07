@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/input"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/lib/input"
 )
 
 // This example demonstrates how to fill out and submit a form.

@@ -6,11 +6,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/cdp"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/ysmood/got"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/lib/cdp"
+	"github.com/runZeroInc/go-rod/lib/launcher"
+	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
 )
 
 func BenchmarkManager(b *testing.B) {
@@ -21,7 +21,7 @@ func BenchmarkManager(b *testing.B) {
 
 	s := got.New(b).Serve()
 
-	// docker run --rm -p 7317:7317 ghcr.io/go-rod/rod
+	// docker run --rm -p 7317:7317 ghcr.io/runZeroInc/go-rod
 	s.HostURL.Host = "host.docker.internal"
 
 	s.Route("/", ".html", `<html><body>

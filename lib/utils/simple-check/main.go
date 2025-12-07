@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/go-rod/rod/lib/utils"
+	"github.com/runZeroInc/go-rod/lib/utils"
 )
 
 func main() {

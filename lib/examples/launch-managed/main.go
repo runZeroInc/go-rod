@@ -4,9 +4,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/utils"
+	"github.com/runZeroInc/go-rod"
+	"github.com/runZeroInc/go-rod/lib/launcher"
+	"github.com/runZeroInc/go-rod/lib/utils"
 )
 
 func main() {
@@ -14,9 +14,9 @@ func main() {
 	// to connect to a running browser check the "../connect-browser" example.
 	// Rod provides a docker image for beginners, run the below to start a launcher.Manager:
 	//
-	//     docker run --rm -p 7317:7317 ghcr.io/go-rod/rod
+	//     docker run --rm -p 7317:7317 ghcr.io/runZeroInc/go-rod
 	//
-	// For available CLI flags run: docker run --rm ghcr.io/go-rod/rod rod-manager -h
+	// For available CLI flags run: docker run --rm ghcr.io/runZeroInc/go-rod rod-manager -h
 	// For more information, check the doc of launcher.Manager
 	l := launcher.MustNewManaged("")
 

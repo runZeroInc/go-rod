@@ -3,10 +3,10 @@ package input_test
 import (
 	"testing"
 
-	"github.com/go-rod/rod/lib/input"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/got"
-	"github.com/ysmood/gson"
+	"github.com/runZeroInc/go-rod/lib/input"
+	"github.com/runZeroInc/go-rod/lib/proto"
+	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/internal/gson"
 )
 
 func TestKeyMap(t *testing.T) {

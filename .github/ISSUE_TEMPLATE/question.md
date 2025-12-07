@@ -13,7 +13,7 @@ Rod Version: v0.0.0
 1. Clone Rod to your local and cd to the repository:
 
    ```bash
-   git clone https://github.com/go-rod/rod
+   git clone https://github.com/runZeroInc/go-rod
    cd rod
    ```
 
