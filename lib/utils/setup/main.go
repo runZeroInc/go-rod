@@ -23,8 +23,6 @@ func golangDeps() {
 }
 
 func nodejsDeps() {
-	utils.UseNode(true)
-
 	utils.Exec("npm i -s eslint-plugin-html")
 }
 

@@ -7,7 +7,6 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -256,15 +255,4 @@ func TestCropImage(t *testing.T) {
 	bin = bytes.NewBuffer(nil)
 	g.E(jpeg.Encode(bin, img, &jpeg.Options{Quality: 80}))
 	g.E(utils.CropImage(bin.Bytes(), 0, 10, 10, 30, 30))
-}
-
-func TestUseNode(t *testing.T) {
-	g := setup(t)
-
-	utils.UseNode(false)
-
-	p, err := exec.LookPath("npx")
-	g.E(err)
-
-	g.Has(p, "v20")
 }
