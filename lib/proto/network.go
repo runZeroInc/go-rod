@@ -998,7 +998,8 @@ type NetworkCookie struct {
 	SourcePort int `json:"sourcePort"`
 
 	// PartitionKey (experimental) (optional) Cookie partition key.
-	PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
+	// TODO: Disabled for now due to panics
+	// PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
 
 	// PartitionKeyOpaque (experimental) (optional) True if cookie partition key is opaque.
 	PartitionKeyOpaque bool `json:"partitionKeyOpaque,omitempty"`
@@ -1250,7 +1251,8 @@ type NetworkCookieParam struct {
 	SourcePort *int `json:"sourcePort,omitempty"`
 
 	// PartitionKey (experimental) (optional) Cookie partition key. If not set, the cookie will be set as not partitioned.
-	PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
+	// TODO: Disabled for now due to panics
+	// PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
 }
 
 // NetworkAuthChallengeSource enum.
@@ -1869,7 +1871,8 @@ type NetworkDeleteCookies struct {
 
 	// PartitionKey (experimental) (optional) If specified, deletes only cookies with the the given name and partitionKey where
 	// all partition key attributes match the cookie partition key attribute.
-	PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
+	// TODO: Disabled for now due to panics
+	// PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
 }
 
 // ProtoReq name.
@@ -2241,7 +2244,8 @@ type NetworkSetCookie struct {
 	SourcePort *int `json:"sourcePort,omitempty"`
 
 	// PartitionKey (experimental) (optional) Cookie partition key. If not set, the cookie will be set as not partitioned.
-	PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
+	// TODO: Disabled for now due to panics
+	// PartitionKey *NetworkCookiePartitionKey `json:"partitionKey,omitempty"`
 }
 
 // ProtoReq name.
@@ -2919,7 +2923,8 @@ type NetworkResponseReceivedExtraInfo struct {
 
 	// CookiePartitionKey (experimental) (optional) The cookie partition key that will be used to store partitioned cookies set in this response.
 	// Only sent when partitioned cookies are enabled.
-	CookiePartitionKey *NetworkCookiePartitionKey `json:"cookiePartitionKey,omitempty"`
+	// TODO: Disabled for now due to panics
+	// CookiePartitionKey *NetworkCookiePartitionKey `json:"cookiePartitionKey,omitempty"`
 
 	// CookiePartitionKeyOpaque (optional) True if partitioned cookies are enabled, but the partition key is not serializable to string.
 	CookiePartitionKeyOpaque bool `json:"cookiePartitionKeyOpaque,omitempty"`
