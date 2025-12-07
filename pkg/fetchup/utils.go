@@ -105,7 +105,7 @@ func (p *progress) Write(b []byte) (n int, err error) {
 }
 
 func (p *progress) report() {
-	out := ""
+	var out string
 	if p.total > 0 {
 		out = fmt.Sprintf("%02d%%", p.count*100/p.total)
 	} else {
@@ -125,6 +125,7 @@ func CacheDir() string {
 	if ok {
 		return cacheDir
 	}
+	return ""
 }
 
 // StripFirstDir removes the first dir but keep all its children.

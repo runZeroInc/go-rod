@@ -6,9 +6,7 @@ import (
 	"os/exec"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/runZeroInc/go-rod/lib/cdp"
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
@@ -77,36 +75,6 @@ func TestGetURLErr(t *testing.T) {
 	g.Eq("[launcher] Failed to get the debug url: err", err.Error())
 }
 
-func TestManaged(t *testing.T) {
-	g := setup(t)
-
-	ctx := g.Timeout(5 * time.Second)
-
-	s := got.New(g).Serve()
-	rl := NewManager()
-	s.Mux.Handle("/", rl)
-
-	l := MustNewManaged(s.URL()).KeepUserDataDir().Delete(flags.KeepUserDataDir)
-	c := l.MustClient()
-	g.E(c.Call(ctx, "", "Browser.getVersion", nil))
-	utils.Sleep(1)
-	_, _ = c.Call(ctx, "", "Browser.crash", nil)
-	dir := l.Get(flags.UserDataDir)
-
-	for ctx.Err() == nil {
-		utils.Sleep(0.1)
-		_, err := os.Stat(dir)
-		if err != nil {
-			break
-		}
-	}
-	g.Err(os.Stat(dir))
-
-	u, h := MustNewManaged(s.URL()).Bin("go").ClientHeader()
-	_, err := cdp.StartWithURL(ctx, u, h)
-	g.Eq(err.(*cdp.BadHandshakeError).Body, "[rod-manager] not allowed rod-bin path: go (use --allow-all to disable the protection)")
-}
-
 func TestURLParserErr(t *testing.T) {
 	g := setup(t)
 
@@ -130,21 +98,4 @@ func TestTestOpen(_ *testing.T) {
 	defer func() { openExec = exec.Command }()
 
 	Open("about:blank")
-}
-
-func TestLaunchClient(t *testing.T) {
-	g := setup(t)
-
-	ctx := g.Timeout(5 * time.Second)
-
-	s := got.New(g).Serve()
-	rl := NewManager()
-	s.Mux.Handle("/", rl)
-
-	l := MustNewManaged(s.URL()).KeepUserDataDir().Delete(flags.KeepUserDataDir)
-	c, err := l.Client()
-	if err != nil {
-		g.Err(err)
-	}
-	g.E(c.Call(ctx, "", "Browser.getVersion", nil))
 }

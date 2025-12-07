@@ -35,7 +35,9 @@ func init() {
 
 	utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
 
-	launcher.NewBrowser().MustGet() // preload browser to local
+	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	utils.E(err)
+	b.MustGet()
 }
 
 var testerPool rod.Pool[G]

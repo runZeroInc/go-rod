@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,53 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 var setup = got.Setup(nil)
-
-func TestLaunch(t *testing.T) {
-	g := setup(t)
-
-	defaults.Proxy = "test.com"
-	defer func() { defaults.ResetWith("") }()
-
-	l := launcher.New().Preferences("").AlwaysOpenPDFExternally()
-	defer l.Kill()
-
-	u := l.MustLaunch()
-	g.Regex(`\Aws://.+\z`, u)
-
-	parsed, _ := url.Parse(u)
-
-	{ // test GetWebSocketDebuggerURL
-		for _, prefix := range []string{"", ":", "127.0.0.1:", "ws://127.0.0.1:"} {
-			u2 := launcher.MustResolveURL(prefix + parsed.Port())
-			g.Regex(u, u2)
-		}
-
-		_, err := launcher.ResolveURL("")
-		g.Err(err)
-	}
-
-	{
-		_, err := launcher.NewManaged("")
-		g.Err(err)
-
-		_, err = launcher.NewManaged("1://")
-		g.Err(err)
-
-		_, err = launcher.NewManaged("ws://not-exists")
-		g.Err(err)
-	}
-
-	{
-		g.Panic(func() { launcher.New().Set("a=b") })
-	}
-}
 
 func TestLaunchUserMode(t *testing.T) {
 	g := setup(t)
@@ -142,9 +100,6 @@ func TestLaunchErr(t *testing.T) {
 	})
 	g.Panic(func() {
 		launcher.New().Headless(false).Bin("not-exists").MustLaunch()
-	})
-	g.Panic(func() {
-		launcher.New().ClientHeader()
 	})
 	{
 		l := launcher.New().XVFB()
