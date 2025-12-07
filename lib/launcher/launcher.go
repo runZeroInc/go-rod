@@ -46,7 +46,6 @@ type Launcher struct {
 
 // New returns the default arguments to start browser.
 // Headless will be enabled by default.
-// Leakless will be enabled by default.
 // UserDataDir will use OS tmp dir by default, this folder will usually be cleaned up by the OS after reboot.
 // It will auto download the browser binary according to the current platform,
 // check [Launcher.Bin] and [Launcher.Revision] for more info.
@@ -57,9 +56,7 @@ func New() *Launcher {
 	}
 
 	defaultFlags := map[flags.Flag][]string{
-		flags.Bin:      {defaults.Bin},
-		flags.Leakless: nil,
-
+		flags.Bin:         {defaults.Bin},
 		flags.UserDataDir: {dir},
 
 		// use random port by default
@@ -273,15 +270,6 @@ func (l *Launcher) AlwaysOpenPDFExternally() *Launcher {
 	return l.Set(flags.Preferences, `{"plugins":{"always_open_pdf_externally": true}}`)
 }
 
-// Leakless switch. If enabled, the browser will be force killed after the Go process exits.
-// The doc of leakless: https://github.com/runZeroInc/go-rod/pkg/leakless.
-func (l *Launcher) Leakless(enable bool) *Launcher {
-	if enable {
-		return l.Set(flags.Leakless)
-	}
-	return l.Delete(flags.Leakless)
-}
-
 // Devtools switch to auto open devtools for each tab.
 func (l *Launcher) Devtools(autoOpenForTabs bool) *Launcher {
 	if autoOpenForTabs {
@@ -442,17 +430,12 @@ func (l *Launcher) Launch() (string, error) {
 
 	args := l.FormatArgs()
 
-	if l.Has(flags.Leakless) && leakless.Support() {
-		ll = leakless.New()
-		cmd = ll.Command(bin, args...)
-	} else {
-		port := l.Get(flags.RemoteDebuggingPort)
-		u, err := ResolveURL(port)
-		if err == nil {
-			return u, nil
-		}
-		cmd = exec.Command(bin, args...)
+	port := l.Get(flags.RemoteDebuggingPort)
+	u, err := ResolveURL(port)
+	if err == nil {
+		return u, nil
 	}
+	cmd = exec.Command(bin, args...)
 
 	l.setupCmd(cmd)
 
@@ -475,7 +458,7 @@ func (l *Launcher) Launch() (string, error) {
 		close(l.exit)
 	}()
 
-	u, err := l.getURL()
+	u, err = l.getURL()
 	if err != nil {
 		l.Kill()
 		return "", err

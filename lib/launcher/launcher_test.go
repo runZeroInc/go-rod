@@ -42,7 +42,6 @@ func TestLaunchUserMode(t *testing.T) {
 	l = l.Context(g.Context()).Delete("test").Bin("").
 		Revision(launcher.RevisionDefault).
 		Logger(io.Discard).
-		Leakless(false).Leakless(true).
 		HeadlessNew(true).HeadlessNew(false).
 		Headless(false).Headless(true).RemoteDebuggingPort(port).
 		NoSandbox(true).NoSandbox(false).
