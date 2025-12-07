@@ -4,7 +4,6 @@ package launcher
 import (
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,7 +17,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/leakless"
 )
 
 // DefaultUserDataDirPrefix ...
@@ -37,9 +35,6 @@ type Launcher struct {
 	parser  *URLParser
 	pid     int
 	exit    chan struct{}
-
-	managed    bool
-	serviceURL string
 
 	isLaunched int32 // zero means not launched
 }
@@ -233,6 +228,7 @@ func (l *Launcher) Headless(enable bool) *Launcher {
 }
 
 // HeadlessNew switch is the "--headless=new" switch: https://developer.chrome.com/docs/chromium/new-headless
+// Note that modern Chrome versions have deprecated the old headless mode and all --headless is new mode.
 func (l *Launcher) HeadlessNew(enable bool) *Launcher {
 	if enable {
 		return l.Set(flags.Headless, "new")
@@ -320,8 +316,8 @@ func (l *Launcher) ProfileDir(dir string) *Launcher {
 }
 
 // RemoteDebuggingPort to launch the browser. Zero for a random port. Zero is the default value.
-// If it's not zero and the Launcher.Leakless is disabled, the launcher will try to reconnect to it first,
-// if the reconnection fails it will launch a new browser.
+// If it's not zero, the launcher will try to reconnect to it first, if the reconnection fails
+// it will launch a new browser.
 func (l *Launcher) RemoteDebuggingPort(port int) *Launcher {
 	return l.Set(flags.RemoteDebuggingPort, fmt.Sprintf("%d", port))
 }
@@ -425,7 +421,6 @@ func (l *Launcher) Launch() (string, error) {
 
 	l.setupUserPreferences()
 
-	var ll *leakless.Launcher
 	var cmd *exec.Cmd
 
 	args := l.FormatArgs()
@@ -444,14 +439,7 @@ func (l *Launcher) Launch() (string, error) {
 		return "", err
 	}
 
-	if ll == nil {
-		l.pid = cmd.Process.Pid
-	} else {
-		l.pid = <-ll.Pid()
-		if ll.Err() != "" {
-			return "", errors.New(ll.Err())
-		}
-	}
+	l.pid = cmd.Process.Pid
 
 	go func() {
 		_ = cmd.Wait()
