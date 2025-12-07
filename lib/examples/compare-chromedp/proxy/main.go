@@ -66,7 +66,7 @@ type transport struct {
 
 func (t *transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if h := r.Header.Get("X-Failed"); h != "" {
-		return nil, fmt.Errorf(h)
+		return nil, fmt.Errorf("%s", h)
 	}
 	return t.RoundTripper.RoundTrip(r)
 }
