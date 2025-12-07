@@ -17,7 +17,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/leakless"
+	"github.com/runZeroInc/go-rod/pkg/leakless"
 )
 
 // DefaultUserDataDirPrefix ...
@@ -268,7 +268,7 @@ func (l *Launcher) AlwaysOpenPDFExternally() *Launcher {
 }
 
 // Leakless switch. If enabled, the browser will be force killed after the Go process exits.
-// The doc of leakless: https://github.com/runZeroInc/go-rod/pkg/internal/leakless.
+// The doc of leakless: https://github.com/runZeroInc/go-rod/pkg/leakless.
 func (l *Launcher) Leakless(enable bool) *Launcher {
 	if enable {
 		return l.Set(flags.Leakless)

@@ -3,7 +3,7 @@ package input
 
 import (
 	"github.com/runZeroInc/go-rod/lib/proto"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 // Modifier values.

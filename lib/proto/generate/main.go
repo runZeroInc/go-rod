@@ -24,7 +24,7 @@ func main() {
 
 		import (
 			"reflect"
-			"github.com/runZeroInc/go-rod/pkg/internal/gson"
+			"github.com/runZeroInc/go-rod/pkg/gson"
 		)
 
 		// Version of cdp protocol
@@ -48,7 +48,7 @@ func main() {
 			package proto
 
 			import (
-				"github.com/runZeroInc/go-rod/pkg/internal/gson"
+				"github.com/runZeroInc/go-rod/pkg/gson"
 			)
 		`
 
@@ -93,7 +93,7 @@ func main() {
 	utils.Exec("gofumpt -w", path)
 	utils.Exec("go run golang.org/x/tools/cmd/goimports@latest -w", path)
 	utils.Exec(
-		"go run github.com/runZeroInc/go-rod/pkg/internal/golangci-lint@latest -- run --fix",
+		"go run github.com/runZeroInc/go-rod/pkg/golangci-lint@latest -- run --fix",
 		path,
 	)
 }

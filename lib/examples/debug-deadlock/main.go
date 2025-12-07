@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runZeroInc/go-rod"
-	"github.com/runZeroInc/go-rod/pkg/internal/gotrace"
+	"github.com/runZeroInc/go-rod/pkg/gotrace"
 )
 
 // This example shows how to detect the hanging points of golang code.

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 func main() {
@@ -66,7 +66,7 @@ func main() {
 
 	utils.Exec("gofumpt -w", path)
 	utils.Exec(
-		"go run github.com/runZeroInc/go-rod/pkg/internal/golangci-lint@latest -- "+
+		"go run github.com/runZeroInc/go-rod/pkg/golangci-lint@latest -- "+
 			"run --fix",
 		filepath.Dir(path),
 	)

@@ -20,7 +20,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/goob"
+	"github.com/runZeroInc/go-rod/pkg/goob"
 )
 
 // Browser implements these interfaces.

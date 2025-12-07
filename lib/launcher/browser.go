@@ -15,8 +15,8 @@ import (
 
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/fetchup"
-	"github.com/runZeroInc/go-rod/pkg/internal/leakless"
+	"github.com/runZeroInc/go-rod/pkg/fetchup"
+	"github.com/runZeroInc/go-rod/pkg/leakless"
 )
 
 // Host formats a revision number to a downloadable URL for the browser.

@@ -20,7 +20,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 var setup = got.Setup(nil)

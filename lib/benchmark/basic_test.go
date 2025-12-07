@@ -10,7 +10,7 @@ import (
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 func BenchmarkCleanup(b *testing.B) {

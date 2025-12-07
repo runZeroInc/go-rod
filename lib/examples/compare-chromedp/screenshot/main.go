@@ -6,7 +6,7 @@ import (
 
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/proto"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 // This example demonstrates how to take a screenshot of a specific element and

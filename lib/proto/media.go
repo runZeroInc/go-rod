@@ -3,7 +3,7 @@
 package proto
 
 import (
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 /*

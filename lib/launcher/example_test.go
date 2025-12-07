@@ -7,7 +7,7 @@ import (
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/leakless"
+	"github.com/runZeroInc/go-rod/pkg/leakless"
 )
 
 func Example_use_system_browser() {

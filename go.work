@@ -5,11 +5,11 @@ use (
 	./lib/examples/custom-websocket
 	./lib/examples/e2e-testing
 	./lib/utils/check-issue
-	./pkg/internal/fetchup
-	./pkg/internal/goob
-	./pkg/internal/gop
-	./pkg/internal/got
-	./pkg/internal/gotrace
-	./pkg/internal/gson
-	./pkg/internal/leakless
+	./pkg/fetchup
+	./pkg/goob
+	./pkg/gop
+	./pkg/got
+	./pkg/gotrace
+	./pkg/gson
+	./pkg/leakless
 )

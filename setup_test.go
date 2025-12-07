@@ -21,9 +21,9 @@ import (
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
-	"github.com/runZeroInc/go-rod/pkg/internal/gotrace"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/got"
+	"github.com/runZeroInc/go-rod/pkg/gotrace"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 var TimeoutEach = flag.Duration("timeout-each", time.Minute, "timeout for each test")

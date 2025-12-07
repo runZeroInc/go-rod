@@ -15,9 +15,9 @@ import (
 	"github.com/runZeroInc/go-rod/lib/js"
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/goob"
-	"github.com/runZeroInc/go-rod/pkg/internal/got/lib/lcs"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/goob"
+	"github.com/runZeroInc/go-rod/pkg/got/lib/lcs"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 // Page implements these interfaces.

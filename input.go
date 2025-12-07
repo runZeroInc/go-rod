@@ -7,7 +7,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/input"
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 // Keyboard represents the keyboard on a page, it's always related the main frame.

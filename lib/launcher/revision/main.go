@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 const mirror = "https://registry.npmmirror.com/-/binary/chromium-browser-snapshots/"

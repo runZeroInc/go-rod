@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/runZeroInc/go-rod"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 // test context.

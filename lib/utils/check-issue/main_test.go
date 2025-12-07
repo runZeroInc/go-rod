@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 func TestBasic(t *testing.T) {

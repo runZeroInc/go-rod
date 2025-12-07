@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/runZeroInc/go-rod/lib/devices"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 func TestErr(t *testing.T) {

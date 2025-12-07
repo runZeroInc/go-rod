@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/runZeroInc/go-rod/lib/proto"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
+	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 type T struct {

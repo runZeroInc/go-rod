@@ -19,9 +19,9 @@ customize or build up their own version of Rod, the high-level functions are jus
 - Thread-safe for all operations
 - Automatically find or download [browser](lib/launcher)
 - High-level helpers like WaitStable, WaitRequestIdle, HijackRequests, WaitDownload, etc
-- Two-step WaitEvent design, never miss an event ([how it works](https://github.com/runZeroInc/go-rod/pkg/internal/goob))
+- Two-step WaitEvent design, never miss an event ([how it works](https://github.com/runZeroInc/go-rod/pkg/goob))
 - Correctly handles nested iframes or shadow DOMs
-- No zombie browser process after the crash ([how it works](https://github.com/runZeroInc/go-rod/pkg/internal/leakless))
+- No zombie browser process after the crash ([how it works](https://github.com/runZeroInc/go-rod/pkg/leakless))
 - [CI](https://github.com/runZeroInc/go-rod/actions) enforced 100% test coverage
 
 ## Examples

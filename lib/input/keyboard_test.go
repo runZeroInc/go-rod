@@ -5,8 +5,8 @@ import (
 
 	"github.com/runZeroInc/go-rod/lib/input"
 	"github.com/runZeroInc/go-rod/lib/proto"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/got"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 func TestKeyMap(t *testing.T) {

@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 type objType int

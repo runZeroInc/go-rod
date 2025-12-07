@@ -14,9 +14,9 @@ import (
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/internal/got"
-	"github.com/runZeroInc/go-rod/pkg/internal/gotrace"
-	"github.com/runZeroInc/go-rod/pkg/internal/gson"
+	"github.com/runZeroInc/go-rod/pkg/got"
+	"github.com/runZeroInc/go-rod/pkg/gotrace"
+	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
 var setup = got.Setup(nil)
