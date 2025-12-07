@@ -1,68 +1,209 @@
 package launcher
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
-	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/fetchup"
-	"github.com/runZeroInc/go-rod/pkg/leakless"
 )
 
-// Host formats a revision number to a downloadable URL for the browser.
-type Host func(revision int) string
+/*
+	Google's Chromium-for-Testing (CfT) project provides builds for macOS (Intel and ARM), Windows (x86 and x64), and Linux (x64):
+	- https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json
 
-var hostConf = map[string]struct {
-	urlPrefix string
-	zipName   string
-}{
-	"darwin_amd64":  {"Mac", "chrome-mac.zip"},
-	"darwin_arm64":  {"Mac_Arm", "chrome-mac.zip"},
-	"linux_amd64":   {"Linux_x64", "chrome-linux.zip"},
-	"windows_386":   {"Win", "chrome-win.zip"},
-	"windows_amd64": {"Win_x64", "chrome-win.zip"},
-}[runtime.GOOS+"_"+runtime.GOARCH]
+	Playwright offers Chromium builds for Linux on ARM:
+	- https://raw.githubusercontent.com/microsoft/playwright/refs/heads/main/packages/playwright-core/browsers.json
+	- https://playwright.azureedge.net/builds/chromium/<revision>/chromium-linux-arm64.zip,
 
-// HostGoogle to download browser.
-func HostGoogle(revision int) string {
-	return fmt.Sprintf(
-		"https://storage.googleapis.com/chromium-browser-snapshots/%s/%d/%s",
-		hostConf.urlPrefix,
-		revision,
-		hostConf.zipName,
-	)
+	Other platforms should use operating-specific packages to install Chromium or Chrome.
+	Note that systems using MUSL instead of GLIBC (like Alpine Linux) require OS packages as well.
+*/
+
+const ChromeForTestingLatestDownloadsURL = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+
+type GoogleCFTLatestDownloadsMeta struct {
+	Timestamp time.Time `json:"timestamp"`
+	Channels  struct {
+		Stable struct {
+			Channel   string `json:"channel"`
+			Version   string `json:"version"`
+			Revision  string `json:"revision"`
+			Downloads struct {
+				Chrome []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome"`
+				Chromedriver []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chromedriver"`
+				ChromeHeadlessShell []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome-headless-shell"`
+			} `json:"downloads"`
+		} `json:"Stable"`
+		Beta struct {
+			Channel   string `json:"channel"`
+			Version   string `json:"version"`
+			Revision  string `json:"revision"`
+			Downloads struct {
+				Chrome []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome"`
+				Chromedriver []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chromedriver"`
+				ChromeHeadlessShell []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome-headless-shell"`
+			} `json:"downloads"`
+		} `json:"Beta"`
+		Dev struct {
+			Channel   string `json:"channel"`
+			Version   string `json:"version"`
+			Revision  string `json:"revision"`
+			Downloads struct {
+				Chrome []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome"`
+				Chromedriver []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chromedriver"`
+				ChromeHeadlessShell []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome-headless-shell"`
+			} `json:"downloads"`
+		} `json:"Dev"`
+		Canary struct {
+			Channel   string `json:"channel"`
+			Version   string `json:"version"`
+			Revision  string `json:"revision"`
+			Downloads struct {
+				Chrome []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome"`
+				Chromedriver []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chromedriver"`
+				ChromeHeadlessShell []struct {
+					Platform string `json:"platform"`
+					URL      string `json:"url"`
+				} `json:"chrome-headless-shell"`
+			} `json:"downloads"`
+		} `json:"Canary"`
+	} `json:"channels"`
 }
 
-// HostNPM to download browser.
-func HostNPM(revision int) string {
-	return fmt.Sprintf(
-		"https://registry.npmmirror.com/-/binary/chromium-browser-snapshots/%s/%d/%s",
-		hostConf.urlPrefix,
-		revision,
-		hostConf.zipName,
-	)
-}
-
-// HostPlaywright to download browser.
-func HostPlaywright(revision int) string {
-	rev := RevisionPlaywright
-	if !(runtime.GOOS == "linux" && runtime.GOARCH == "arm64") {
-		rev = revision
+func ResolveChromeForTestingPlatform(os string, arch string) string {
+	switch os {
+	case "darwin":
+		switch arch {
+		case "arm64":
+			return "mac-arm64"
+		case "amd64":
+			return "mac-x64"
+		}
+	case "linux":
+		if arch == "amd64" {
+			return "linux64"
+		}
+	case "windows":
+		switch arch {
+		case "amd64":
+			return "win64"
+		case "386":
+			return "win32"
+		}
 	}
-	return fmt.Sprintf(
-		"https://playwright.azureedge.net/builds/chromium/%d/chromium-linux-arm64.zip",
-		rev,
-	)
+	return ""
+}
+
+const PlaywrightBrowserMetaURL = "https://raw.githubusercontent.com/microsoft/playwright/refs/heads/main/packages/playwright-core/browsers.json"
+const PlaywrightLinuxArm64URL = "https://playwright.azureedge.net/builds/chromium/%s/chromium-linux-arm64.zip"
+
+type PlaywrightBrowsersMeta struct {
+	Comment  string `json:"comment"`
+	Browsers []struct {
+		Name              string            `json:"name"`
+		Revision          string            `json:"revision"`
+		InstallByDefault  bool              `json:"installByDefault"`
+		BrowserVersion    string            `json:"browserVersion,omitempty"`
+		Title             string            `json:"title,omitempty"`
+		RevisionOverrides map[string]string `json:"revisionOverrides,omitempty"`
+	} `json:"browsers"`
+}
+
+// ResolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
+// It returns an error if the platform is unsupported or if there are issues fetching or parsing the metadata.
+func ResolveLatestDownloadURL(os string, arch string) (string, string, error) {
+	// First try Google Chromium-for-Testing for common platforms
+	if cftPlatform := ResolveChromeForTestingPlatform(os, arch); cftPlatform != "" {
+		var latestJSON GoogleCFTLatestDownloadsMeta
+		if err := downloadJSON(ChromeForTestingLatestDownloadsURL, &latestJSON); err != nil {
+			return "", "", err
+		}
+		stable := latestJSON.Channels.Stable
+		for _, download := range stable.Downloads.Chrome {
+			if download.Platform == cftPlatform {
+				return download.URL, stable.Revision, nil
+			}
+		}
+	}
+	// Special handling for Linux ARM64 via Playwright
+	if os == "linux" && arch == "arm64" {
+		var latestJSON PlaywrightBrowsersMeta
+		if err := downloadJSON(PlaywrightBrowserMetaURL, &latestJSON); err != nil {
+			return "", "", err
+		}
+		for _, browser := range latestJSON.Browsers {
+			if browser.Name == "chromium" {
+				return fmt.Sprintf(PlaywrightLinuxArm64URL, browser.Revision), browser.Revision, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("unsupported platform: %s-%s", os, arch)
+}
+
+func downloadJSON(url string, target any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request for latest metadata: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to fetch latest metadata: %w", err)
+	}
+	defer resp.Body.Close()
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("failed to decode metadata response: %w", err)
+	}
+	return nil
 }
 
 // DefaultBrowserDir for downloaded browser. For unix is "$HOME/.cache/rod/browser",
@@ -77,12 +218,11 @@ var DefaultBrowserDir = filepath.Join(map[string]string{
 type Browser struct {
 	Context context.Context
 
-	// Hosts are the candidates to download the browser.
-	// Such as [HostGoogle] or [HostNPM].
-	Hosts []Host
+	// Operating system
+	OS string
 
-	// Revision of the browser to use
-	Revision int
+	// CPU architecture
+	Arch string
 
 	// RootDir to download different browser versions.
 	RootDir string
@@ -90,77 +230,168 @@ type Browser struct {
 	// Log to print output
 	Logger utils.Logger
 
-	// LockPort a tcp port to prevent race downloading. Default is 2968 .
-	LockPort int
+	// Revision
+	Revision int
+
+	// DownloadURL for the browser
+	DownloadURL string
 
 	// HTTPClient to download the browser
 	HTTPClient *http.Client
 }
 
 // NewBrowser with default values.
-func NewBrowser() *Browser {
-	return &Browser{
-		Context:  context.Background(),
-		Revision: RevisionDefault,
-		Hosts:    []Host{HostGoogle, HostNPM, HostPlaywright},
-		RootDir:  DefaultBrowserDir,
-		Logger:   log.New(os.Stdout, "[launcher.Browser]", log.LstdFlags),
-		LockPort: defaults.LockPort,
+func NewBrowser(srcOS, srcArch string) (*Browser, error) {
+	b := &Browser{
+		Context: context.Background(),
+		RootDir: DefaultBrowserDir,
+		Logger:  log.New(os.Stdout, "[launcher.Browser]", log.LstdFlags),
+		OS:      srcOS,
+		Arch:    srcArch,
+		HTTPClient: &http.Client{
+			Timeout: 15 * time.Minute,
+		},
+		Revision: 0,
 	}
+
+	dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
+	if err != nil {
+		return nil, err
+	}
+
+	if dpath == "" {
+		return nil, fmt.Errorf("unsupported platform")
+	}
+	b.DownloadURL = dpath
+
+	b.Revision, err = strconv.Atoi(rev)
+	if err != nil {
+		return nil, fmt.Errorf("bad revision '%s': %w", rev, err)
+	}
+
+	return b, nil
 }
 
 // Dir to download the browser.
-func (lc *Browser) Dir() string {
+func (lc *Browser) DownloadDir() string {
 	return filepath.Join(lc.RootDir, fmt.Sprintf("chromium-%d", lc.Revision))
+}
+
+var BinPaths = map[string]string{
+	"darwin":  "Chromium.app/Contents/MacOS/Chromium",
+	"linux":   "chrome",
+	"windows": "chrome.exe",
 }
 
 // BinPath to download the browser executable.
 func (lc *Browser) BinPath() string {
-	bin := map[string]string{
-		"darwin":  "Chromium.app/Contents/MacOS/Chromium",
-		"linux":   "chrome",
-		"windows": "chrome.exe",
-	}[runtime.GOOS]
-
-	return filepath.Join(lc.Dir(), filepath.FromSlash(bin))
+	bin, ok := BinPaths[lc.OS]
+	if !ok {
+		return ""
+	}
+	return filepath.Join(lc.DownloadDir(), filepath.FromSlash(bin))
 }
 
-// Download browser from the fastest host.
-// It will race downloading a TCP packet from each host and use the fastest host.
+// Resolve and download the correct URL for the platform
 func (lc *Browser) Download() error {
-	us := []string{}
-	for _, host := range lc.Hosts {
-		us = append(us, host(lc.Revision))
+	lc.Logger.Println(fmt.Sprintf("downloading chromium revision %d from %s to %s (%s-%s)", lc.Revision, lc.DownloadURL, lc.DownloadDir(), lc.OS, lc.Arch))
+	if err := os.MkdirAll(lc.DownloadDir(), 0o755); err != nil {
+		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	dir := lc.Dir()
-
-	fu := fetchup.New(dir, us...)
-	fu.Ctx = lc.Context
-	fu.Logger = lc.Logger
-	if lc.HTTPClient != nil {
-		fu.HttpClient = lc.HTTPClient
-	}
-
-	err := fu.Fetch()
+	tmpFile, err := os.CreateTemp("", "go-rod-chromium-*.zip")
 	if err != nil {
-		return fmt.Errorf("can't find a browser binary for your OS, the doc might help https://go-rod.github.io/#/compatibility?id=os : %w", err) //nolint: lll
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	defer os.Remove(tmpName)
+
+	req, err := http.NewRequestWithContext(lc.Context, http.MethodGet, lc.DownloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed get zip: %w", err)
+	}
+	n, err := io.Copy(tmpFile, res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to download zip: %w", err)
+	}
+	lc.Logger.Println(fmt.Sprintf("downloaded %d bytes\n", n))
+	_ = tmpFile.Close()
+	_ = res.Body.Close()
+
+	fd, err := os.Open(tmpName)
+	if err != nil {
+		return fmt.Errorf("failed to open zip file: %w", err)
+	}
+	defer fd.Close()
+	fi, err := fd.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat temp file: %w", err)
 	}
 
-	return fetchup.StripFirstDir(dir)
+	zr, err := zip.NewReader(fd, fi.Size())
+	if err != nil {
+		return fmt.Errorf("failed to read zip file: %w", err)
+	}
+
+	for _, f := range zr.File {
+		// Trim the first part of the name from the path
+		dname, trimmed, ok := strings.Cut(f.Name, "/")
+		if ok {
+			dname = trimmed
+		}
+		dname = filepath.Clean(dname)
+		fpath := filepath.Join(lc.DownloadDir(), dname)
+
+		lc.Logger.Println(fmt.Sprintf("extracting %s to %s\n", f.Name, fpath))
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(fpath, 0o755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", fpath, err)
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(fpath), 0o755); err != nil {
+			return fmt.Errorf("failed to create directory for file %s: %w", fpath, err)
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", fpath, err)
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open zip entry %s: %w", f.Name, err)
+		}
+
+		_, err = io.Copy(outFile, rc)
+		if err != nil {
+			_ = rc.Close()
+			_ = outFile.Close()
+			return fmt.Errorf("failed to extract file %s: %w", fpath, err)
+		}
+
+		_ = rc.Close()
+		_ = outFile.Close()
+	}
+
+	lc.Logger.Println("extraction completed")
+
+	return nil
 }
 
 // Get is a smart helper to get the browser executable path.
 // If [Browser.BinPath] is not valid it will auto download the browser to [Browser.BinPath].
 func (lc *Browser) Get() (string, error) {
-	defer leakless.LockPort(lc.LockPort)()
 
 	if lc.Validate() == nil {
 		return lc.BinPath(), nil
 	}
-
-	// Try to cleanup before downloading
-	_ = os.RemoveAll(lc.Dir())
 
 	return lc.BinPath(), lc.Download()
 }

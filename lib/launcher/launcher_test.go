@@ -1,63 +1,27 @@
 package launcher_test
 
 import (
-	"archive/zip"
-	"bytes"
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
-	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 )
 
 var setup = got.Setup(nil)
-
-func TestDownloadHosts(t *testing.T) {
-	g := setup(t)
-
-	g.Has(launcher.HostGoogle(launcher.RevisionDefault), "https://storage.googleapis.com/chromium-browser-snapshots")
-	g.Has(launcher.HostNPM(launcher.RevisionDefault), "https://registry.npmmirror.com/-/binary/chromium-browser-snapshots")
-	g.Has(launcher.HostPlaywright(launcher.RevisionDefault), "https://playwright.azureedge.net/")
-}
-
-func TestDownload(t *testing.T) {
-	g := got.T(t)
-
-	buf := bytes.NewBuffer(nil)
-	z := zip.NewWriter(buf)
-	f, _ := z.Create(filepath.FromSlash("a/b/c.txt"))
-	_, _ = f.Write([]byte(g.RandStr(500 * 1024)))
-	_ = z.Close()
-
-	s := g.Serve()
-	s.Route("/", ".zip", buf.Bytes())
-
-	b := launcher.NewBrowser()
-	b.Revision = 1
-	b.Logger = utils.LoggerQuiet
-	b.Hosts = []launcher.Host{func(_ int) string {
-		return s.URL("/a.zip")
-	}}
-
-	g.Cleanup(func() { _ = os.RemoveAll(b.Dir()) })
-
-	b.MustGet()
-
-	g.PathExists(b.Dir())
-}
 
 func TestLaunch(t *testing.T) {
 	g := setup(t)
@@ -210,26 +174,6 @@ func TestProfileDir(t *testing.T) {
 	g.True(file.IsDir())
 }
 
-func TestBrowserValid(t *testing.T) {
-	g := setup(t)
-
-	b := launcher.NewBrowser()
-	b.Revision = 0
-	g.Err(b.Validate())
-
-	g.E(utils.Mkdir(filepath.Dir(b.BinPath())))
-	g.Cleanup(func() { _ = os.RemoveAll(b.Dir()) })
-
-	g.E(exec.Command("go", "build", "-o", b.BinPath(), "./fixtures/chrome-exit-err").CombinedOutput())
-	g.Has(b.Validate().Error(), "failed to run the browser")
-
-	g.E(exec.Command("go", "build", "-o", b.BinPath(), "./fixtures/chrome-empty").CombinedOutput())
-	g.Eq(b.Validate().Error(), "the browser executable doesn't support headless mode")
-
-	g.E(exec.Command("go", "build", "-o", b.BinPath(), "./fixtures/chrome-lib-missing").CombinedOutput())
-	g.Nil(b.Validate())
-}
-
 func TestIgnoreCerts(t *testing.T) {
 	g := setup(t)
 
@@ -294,24 +238,6 @@ func TestIgnoreCerts_InvalidCert(t *testing.T) {
 	}
 }
 
-func TestBrowserDownloadErr(t *testing.T) {
-	g := setup(t)
-	b := launcher.NewBrowser()
-	b.Logger = utils.LoggerQuiet
-	b.HTTPClient = http.DefaultClient
-	b.Hosts = []launcher.Host{}
-	g.Err(b.Download())
-
-	s := g.Serve()
-	s.Route("/download", ".txt", "ok")
-
-	b = launcher.NewBrowser()
-	b.Hosts = []launcher.Host{func(_ int) string {
-		return s.URL("/download/file")
-	}}
-	g.Err(b.Download())
-}
-
 func TestLaunchMultiTimes(t *testing.T) {
 	g := setup(t)
 
@@ -324,4 +250,95 @@ func TestLaunchMultiTimes(t *testing.T) {
 	// second time launch, failed with ErrAlreadyLaunched.
 	_, e = l.Launch()
 	g.Eq(e, launcher.ErrAlreadyLaunched)
+}
+
+func Test_ResolveDownloadURL(t *testing.T) {
+	type srcPlatform struct {
+		os   string
+		arch string
+	}
+	tests := []struct {
+		name      string
+		platform  srcPlatform
+		wantMatch *regexp.Regexp
+	}{
+		{
+			name: "linux-arm64",
+			platform: srcPlatform{
+				os:   "linux",
+				arch: "arm64",
+			},
+			wantMatch: regexp.MustCompile(`https://playwright.azureedge.net/builds/chromium/\d+/chromium-linux-arm64.zip`),
+		},
+		{
+			name: "linux-x64",
+			platform: srcPlatform{
+				os:   "linux",
+				arch: "amd64",
+			},
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/linux64/chrome-linux64.zip`),
+		},
+		{
+			name: "windows-x64",
+			platform: srcPlatform{
+				os:   "windows",
+				arch: "amd64",
+			},
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/win64/chrome-win64.zip`),
+		},
+		{
+			name: "windows-x86",
+			platform: srcPlatform{
+				os:   "windows",
+				arch: "386",
+			},
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/win32/chrome-win32.zip`),
+		},
+		{
+			name: "macos-x64",
+			platform: srcPlatform{
+				os:   "darwin",
+				arch: "amd64",
+			},
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/mac-x64/chrome-mac-x64.zip`),
+		},
+		{
+			name: "macos-arm64",
+			platform: srcPlatform{
+				os:   "darwin",
+				arch: "arm64",
+			},
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/mac-arm64/chrome-mac-arm64.zip`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, rev, err := launcher.ResolveLatestDownloadURL(tt.platform.os, tt.platform.arch)
+			if err != nil {
+				t.Fatalf("ResolveLatestDownloadURL() error = %v", err)
+			}
+			if !tt.wantMatch.MatchString(got) {
+				t.Errorf("ResolveLatestDownloadURL() = %v, didn't match %v", got, tt.wantMatch)
+			}
+			v, err := strconv.Atoi(rev)
+			if err != nil {
+				t.Fatalf("ResolveLatestDownloadURL() revision parse error = %v", err)
+			}
+			if v <= 0 {
+				t.Errorf("ResolveLatestDownloadURL() revision = %v, want a positive integer", rev)
+			}
+		})
+	}
+}
+
+func Test_ResolveDownloader(t *testing.T) {
+	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	t.Errorf("browser: %+v", b)
+	if err != nil {
+		t.Fatalf("NewBrowser() error = %v", err)
+	}
+	err = b.Download()
+	if err != nil {
+		t.Fatalf("Browser.Download() error = %v", err)
+	}
 }

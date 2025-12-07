@@ -114,12 +114,17 @@ func (p *progress) report() {
 	p.logger.Println(EventProgress, out)
 }
 
+var CacheDirs = map[string]string{
+	"windows": filepath.Join(os.Getenv("APPDATA")),
+	"darwin":  filepath.Join(os.Getenv("HOME"), ".cache"),
+	"linux":   filepath.Join(os.Getenv("HOME"), ".cache"),
+}
+
 func CacheDir() string {
-	return filepath.Join(map[string]string{
-		"windows": filepath.Join(os.Getenv("APPDATA")),
-		"darwin":  filepath.Join(os.Getenv("HOME"), ".cache"),
-		"linux":   filepath.Join(os.Getenv("HOME"), ".cache"),
-	}[runtime.GOOS])
+	cacheDir, ok := CacheDirs[runtime.GOOS]
+	if ok {
+		return cacheDir
+	}
 }
 
 // StripFirstDir removes the first dir but keep all its children.

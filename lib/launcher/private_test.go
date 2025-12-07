@@ -1,11 +1,9 @@
 package launcher
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -16,18 +14,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 )
-
-func HostTest(host string) Host {
-	return func(revision int) string {
-		return fmt.Sprintf(
-			"%s/chromium-browser-snapshots/%s/%d/%s",
-			host,
-			hostConf.urlPrefix,
-			revision,
-			hostConf.zipName,
-		)
-	}
-}
 
 var setup = got.Setup(nil)
 
@@ -119,23 +105,6 @@ func TestManaged(t *testing.T) {
 	u, h := MustNewManaged(s.URL()).Bin("go").ClientHeader()
 	_, err := cdp.StartWithURL(ctx, u, h)
 	g.Eq(err.(*cdp.BadHandshakeError).Body, "[rod-manager] not allowed rod-bin path: go (use --allow-all to disable the protection)")
-}
-
-func TestLaunchErrs(t *testing.T) {
-	g := setup(t)
-
-	l := New().Bin("echo")
-	_, err := l.Launch()
-	g.Err(err)
-
-	s := g.Serve()
-	s.Route("/", "", nil)
-	l = New().Bin("")
-	l.browser.Logger = utils.LoggerQuiet
-	l.browser.RootDir = filepath.Join("tmp", "browser-from-mirror", g.RandStr(16))
-	l.browser.Hosts = []Host{HostTest(s.URL())}
-	_, err = l.Launch()
-	g.Err(err)
 }
 
 func TestURLParserErr(t *testing.T) {

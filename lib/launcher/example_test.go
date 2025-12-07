@@ -3,6 +3,7 @@ package launcher_test
 import (
 	"os"
 	"os/exec"
+	"runtime"
 
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
@@ -25,7 +26,9 @@ func Example_print_browser_CLI_output() {
 
 func Example_custom_launch() {
 	// get the browser executable path
-	path := launcher.NewBrowser().MustGet()
+	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	utils.E(err)
+	path := b.MustGet()
 
 	// use the FormatArgs to construct args, this line is optional, you can construct the args manually
 	args := launcher.New().FormatArgs()

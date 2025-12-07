@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -110,12 +111,15 @@ func New() *Launcher {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	browser, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
+	utils.E(err)
+
 	return &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
 		Flags:     defaultFlags,
 		exit:      make(chan struct{}),
-		browser:   NewBrowser(),
+		browser:   browser,
 		parser:    NewURLParser(),
 		logger:    io.Discard,
 	}
@@ -128,6 +132,8 @@ func NewUserMode() *Launcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	bin, _ := LookPath()
 
+	b, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
+	utils.E(err)
 	return &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
@@ -136,7 +142,7 @@ func NewUserMode() *Launcher {
 			"no-startup-window":       nil,
 			flags.Bin:                 {bin},
 		},
-		browser: NewBrowser(),
+		browser: b,
 		exit:    make(chan struct{}),
 		parser:  NewURLParser(),
 		logger:  io.Discard,

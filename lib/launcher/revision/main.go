@@ -16,23 +16,27 @@ import (
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
-const mirror = "https://registry.npmmirror.com/-/binary/chromium-browser-snapshots/"
+// PlaywrightBrowserURL is a direct reference to the latest Playwright browser metdata.
+const PlaywrightBrowserURL = "https://raw.githubusercontent.com/microsoft/playwright/refs/heads/main/packages/playwright-core/browsers.json"
+
+// PlaywrightChromiumSnapshotURL is the URL to fetch the Chromium snapshot versions used by Playwright.
+const PlaywrightChromiumSnapshotURL = "https://registry.npmmirror.com/-/binary/chromium-browser-snapshots/"
 
 func main() {
-	list := getList(mirror)
-
+	list := getList(PlaywrightChromiumSnapshotURL)
 	revLists := [][]int{}
 	for _, os := range list {
 		// skip win32
 		if os == "Win" {
 			continue
 		}
+		log.Printf("fetching revisions for %s", os)
 
 		revList := []int{}
-		for _, s := range getList(mirror + os + "/") {
+		for _, s := range getList(PlaywrightChromiumSnapshotURL + os + "/") {
 			rev, err := strconv.ParseInt(s, 10, 32)
 			if err != nil {
-				log.Fatal(err)
+				continue
 			}
 			revList = append(revList, int(rev))
 		}
@@ -42,8 +46,8 @@ func main() {
 
 	rev := largestCommonRevision(revLists)
 
-	if rev < 969819 {
-		utils.E(fmt.Errorf("cannot match version of the latest chromium from %s", mirror))
+	if rev < 1495889 {
+		utils.E(fmt.Errorf("cannot match version of the latest chromium from %s", PlaywrightChromiumSnapshotURL))
 	}
 
 	playwright := getFromPlaywright()
@@ -116,10 +120,7 @@ func has(list []int, i int) bool {
 }
 
 func getFromPlaywright() int {
-	pv := strings.TrimSpace(utils.ExecLine(false, "npm --no-update-notifier -s show playwright version"))
-	out := fetch(fmt.Sprintf(
-		"https://raw.githubusercontent.com/microsoft/playwright/v%s/packages/playwright-core/browsers.json",
-		pv))
+	out := fetch(PlaywrightBrowserURL)
 	rev, err := strconv.ParseInt(gson.NewFrom(out).Get("browsers.0.revision").Str(), 10, 32)
 	utils.E(err)
 	return int(rev)
