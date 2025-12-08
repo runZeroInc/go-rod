@@ -12,6 +12,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 func TestPageElements(t *testing.T) {
@@ -367,7 +368,7 @@ func TestElementTracing(t *testing.T) {
 	g := setup(t)
 
 	g.browser.Trace(true)
-	g.browser.Logger(utils.LoggerQuiet)
+	g.browser.Logger(logrus.New())
 	defer func() {
 		g.browser.Trace(defaults.Trace)
 		g.browser.Logger(rod.DefaultLogger)

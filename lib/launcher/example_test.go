@@ -1,12 +1,12 @@
 package launcher_test
 
 import (
-	"os"
 	"os/exec"
 
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/sirupsen/logrus"
 )
 
 func Example_use_system_browser() {
@@ -18,7 +18,7 @@ func Example_use_system_browser() {
 
 func Example_print_browser_CLI_output() {
 	// Pipe the browser stderr and stdout to os.Stdout .
-	u := launcher.NewMust().Logger(os.Stdout).MustLaunch()
+	u := launcher.NewMust().Logger(logrus.New()).MustLaunch()
 	rod.New().ControlURL(u).MustConnect()
 }
 

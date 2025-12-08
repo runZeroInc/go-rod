@@ -274,10 +274,8 @@ func TestCancelCallLeak(t *testing.T) {
 }
 
 func TestConcurrentCall(t *testing.T) {
-
 	req := make(chan []byte, 30)
 	t.Cleanup(func() { close(req) })
-
 	ws := &MockWebSocket{
 		send: func(data []byte) error {
 			req <- data

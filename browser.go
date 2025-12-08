@@ -9,6 +9,7 @@ package rod
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/goob"
+	"github.com/sirupsen/logrus"
 )
 
 // Browser implements these interfaces.
@@ -43,7 +45,7 @@ type Browser struct {
 
 	sleeper func() utils.Sleeper
 
-	logger utils.Logger
+	logger *logrus.Logger
 
 	slowMotion time.Duration // see defaults.slow
 	trace      bool          // see defaults.Trace
@@ -56,6 +58,8 @@ type Browser struct {
 	event       *goob.Observable // all the browser events from cdp client
 	targetsLock *sync.Mutex
 
+	launchOptions []launcher.BrowserOption
+
 	// stores all the previous cdp call of same type. Browser doesn't have enough API
 	// for us to retrieve all its internal states. This is an workaround to map them to local.
 	// For example you can't use cdp API to get the current position of mouse.
@@ -66,7 +70,7 @@ type Browser struct {
 // DefaultDevice to emulate is set to [devices.LaptopWithMDPIScreen].Landscape(), it will change the default
 // user-agent and can make the actual view area smaller than the browser window on headful mode,
 // you can use [Browser.NoDefaultDevice] to disable it.
-func New() *Browser {
+func New(opts ...launcher.BrowserOption) *Browser {
 	return (&Browser{
 		ctx:           context.Background(),
 		sleeper:       DefaultSleeper,
@@ -78,6 +82,7 @@ func New() *Browser {
 		defaultDevice: devices.LaptopWithMDPIScreen.Landscape(),
 		targetsLock:   &sync.Mutex{},
 		states:        &sync.Map{},
+		launchOptions: opts,
 	}).WithPanic(utils.Panic)
 }
 
@@ -119,7 +124,7 @@ func (b *Browser) Monitor(url string) *Browser {
 }
 
 // Logger overrides the default log functions for tracing.
-func (b *Browser) Logger(l utils.Logger) *Browser {
+func (b *Browser) Logger(l *logrus.Logger) *Browser {
 	b.logger = l
 	return b
 }
@@ -150,7 +155,7 @@ func (b *Browser) Connect() error {
 		u := b.controlURL
 		if u == "" {
 			var err error
-			l, err := launcher.New()
+			l, err := launcher.New(b.launchOptions...)
 			if err != nil {
 				return err
 			}
@@ -166,7 +171,7 @@ func (b *Browser) Connect() error {
 		}
 		b.client = c
 	} else if b.controlURL != "" {
-		panic("Browser.Client and Browser.ControlURL can't be set at the same time")
+		return fmt.Errorf("browser Client and browser ControlURL can't be set at the same time")
 	}
 
 	b.initEvents()

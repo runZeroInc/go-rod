@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,7 +39,6 @@ func TestLaunchUserMode(t *testing.T) {
 
 	l = l.Context(g.Context()).Delete("test").Bin("").
 		Revision(launcher.RevisionDefault).
-		Logger(io.Discard).
 		HeadlessNew(true).HeadlessNew(false).
 		Headless(false).Headless(true).RemoteDebuggingPort(port).
 		NoSandbox(true).NoSandbox(false).

@@ -9,8 +9,8 @@ import (
 	"github.com/runZeroInc/go-rod/lib/js"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/proto"
-	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 func TestMonitor(t *testing.T) {
@@ -56,7 +56,6 @@ func TestTrace(t *testing.T) {
 	g.Eq(rod.TraceTypeInput.String(), "[input]")
 
 	var msg []interface{}
-	g.browser.Logger(utils.Log(func(list ...interface{}) { msg = list }))
 	g.browser.Trace(true).SlowMotion(time.Microsecond)
 	defer func() {
 		g.browser.Logger(rod.DefaultLogger)
@@ -64,7 +63,9 @@ func TestTrace(t *testing.T) {
 	}()
 
 	p := g.page.MustNavigate(g.srcFile("fixtures/click.html")).MustWaitLoad()
-
+	if len(msg) < 3 {
+		t.Fatal("empty msg")
+	}
 	g.Eq(rod.TraceTypeWait, msg[0])
 	g.Eq("load", msg[1])
 	g.Eq(p, msg[2])
@@ -83,7 +84,7 @@ func TestTrace(t *testing.T) {
 func TestTraceLogs(t *testing.T) {
 	g := setup(t)
 
-	g.browser.Logger(utils.LoggerQuiet)
+	g.browser.Logger(logrus.New())
 	g.browser.Trace(true)
 	defer func() {
 		g.browser.Logger(rod.DefaultLogger)

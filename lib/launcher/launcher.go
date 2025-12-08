@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -16,6 +17,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // DefaultUserDataDirPrefix ...
@@ -28,7 +30,7 @@ type Launcher struct {
 	ctx       context.Context
 	ctxCancel func()
 
-	logger io.Writer
+	logger *logrus.Logger
 
 	browser *Browser
 	parser  *URLParser
@@ -45,13 +47,14 @@ type Launcher struct {
 // It will auto download the browser binary according to the current platform,
 // check [Launcher.Bin] and [Launcher.Revision] for more info.
 func New(opts ...BrowserOption) (*Launcher, error) {
-	var err error
-	dir := defaults.Dir
-	if dir == "" {
-		dir, err = os.MkdirTemp("", "go-rod-launcher-*")
-		if err != nil {
-			return nil, fmt.Errorf("mktemp user data dir: %w", err)
-		}
+	tmpB := &Browser{}
+	for _, opt := range opts {
+		opt(tmpB)
+	}
+
+	dir, err := os.MkdirTemp(tmpB.TempDir, "go-rod-launcher-*")
+	if err != nil {
+		return nil, fmt.Errorf("mktemp user data dir %s: %w", dir, err)
 	}
 
 	defaultFlags := map[flags.Flag][]string{
@@ -79,6 +82,7 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		"disable-client-side-phishing-detection":             nil,
 		"disable-component-extensions-with-background-pages": nil,
 		"disable-default-apps":                               nil,
+		"disable-gpu":                                        nil,
 		"disable-hang-monitor":                               nil,
 		"disable-ipc-flooding-protection":                    nil,
 		"disable-popup-blocking":                             nil,
@@ -106,6 +110,12 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		defaultFlags[flags.ProxyServer] = []string{defaults.Proxy}
 	}
 
+	if tmpB.WindowWidth != 0 && tmpB.WindowHeight != 0 {
+		defaultFlags[flags.WindowSize] = []string{
+			fmt.Sprintf("%d,%d", tmpB.WindowWidth, tmpB.WindowHeight),
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	browser, err := NewBrowser(opts...)
 	if err != nil {
@@ -113,16 +123,19 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		return nil, err
 	}
 
-	return &Launcher{
+	l := &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
 		Flags:     defaultFlags,
 		exit:      make(chan struct{}),
 		browser:   browser,
 		parser:    NewURLParser(),
-		logger:    io.Discard,
+		logger:    tmpB.Logger,
 		dir:       dir,
-	}, nil
+	}
+	l = l.WindowSize(tmpB.WindowWidth, tmpB.WindowHeight)
+
+	return l, nil
 }
 
 func NewMust(opts ...BrowserOption) *Launcher {
@@ -156,7 +169,7 @@ func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 		browser: b,
 		exit:    make(chan struct{}),
 		parser:  NewURLParser(),
-		logger:  io.Discard,
+		logger:  b.Logger,
 	}, nil
 }
 
@@ -428,8 +441,8 @@ func (l *Launcher) FormatArgs() []string {
 // For example, pipe all browser output to stdout:
 //
 //	launcher.New().Logger(os.Stdout)
-func (l *Launcher) Logger(w io.Writer) *Launcher {
-	l.logger = w
+func (l *Launcher) Logger(logger *logrus.Logger) *Launcher {
+	l.logger = logger
 	return l
 }
 
@@ -471,6 +484,7 @@ func (l *Launcher) Launch() (string, error) {
 	cmd = exec.Command(bin, args...)
 
 	l.setupCmd(cmd)
+	l.Env(getCleanChromeEnv(runtime.GOOS, l.Get(flags.UserDataDir))...)
 
 	err = cmd.Start()
 	if err != nil {
@@ -526,8 +540,8 @@ func (l *Launcher) setupCmd(cmd *exec.Cmd) {
 	cmd.Dir = dir
 	cmd.Env = env
 
-	cmd.Stdout = io.MultiWriter(l.logger, l.parser)
-	cmd.Stderr = io.MultiWriter(l.logger, l.parser)
+	cmd.Stdout = io.MultiWriter(l.logger.Writer(), l.parser)
+	cmd.Stderr = io.MultiWriter(l.logger.Writer(), l.parser)
 }
 
 func (l *Launcher) getBin() (string, error) {
@@ -578,4 +592,45 @@ func (l *Launcher) Cleanup() {
 
 	dir := l.Get(flags.UserDataDir)
 	_ = os.RemoveAll(dir)
+}
+
+func getCleanChromeEnv(srcOS string, profileDir string) []string {
+	// Clean the environment for launching Chrome
+	cleanEnv := []string{}
+	for _, ent := range os.Environ() {
+		ekey, eval, _ := strings.Cut(ent, "=")
+		ekey = strings.ToUpper(ekey)
+		if ekey == "TMP" || ekey == "TEMP" || ekey == "TMPDIR" {
+			continue
+		}
+		// Skip XDG (home, config, cache, runtime) to avoid conflicts
+		if strings.HasPrefix(ekey, "XDG_") {
+			continue
+		}
+		// Skip DBUS to avoid autolaunch delays and errors
+		if strings.HasPrefix(ekey, "DBUS_") {
+			continue
+		}
+		// Skip CHROME_* environment variables that may be set system-wide
+		if strings.HasPrefix(ekey, "CHROME") {
+			// Disable existing environment overrides (CHROME_DEBUG_LOG, CHROME_CONFIG_HOME, etc)
+			continue
+		}
+		// Skip proxy environment variables to avoid conflicts
+		if ekey == "ALL_PROXY" || ekey == "HTTP_PROXY" || ekey == "HTTPS_PROXY" || ekey == "FTP_PROXY" || ekey == "AUTO_PROXY" || ekey == "SOCKS_SERVER" || ekey == "NO_PROXY" {
+			// Disable all proxy parameters
+			continue
+		}
+		cleanEnv = append(cleanEnv, strings.Join([]string{ekey, eval}, "="))
+	}
+
+	// Chrome needs a writeable temporary and profile directory, especially when running as a less-privileged user
+	// Without these, Chrome will fail wth errors like:
+	// - chrome_crashpad_handler: --database is required - Try 'chrome_crashpad_handler --help' for more information.
+	tmpOverrides := []string{"TMP", "TEMP", "TMPDIR", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"}
+	for _, ekey := range tmpOverrides {
+		cleanEnv = append(cleanEnv, ekey+"="+profileDir)
+	}
+
+	return cleanEnv
 }

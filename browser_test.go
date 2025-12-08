@@ -573,9 +573,9 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 		},
 	}
 
-	os.Setenv("LocalAppData", `C:\Users\TestUser\AppData\Local`)
-	os.Setenv("ProgramFiles", `C:\Program Files`)
-	os.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
+	t.Setenv("LocalAppData", `C:\Users\TestUser\AppData\Local`)
+	t.Setenv("ProgramFiles", `C:\Program Files`)
+	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
 	for _, tt := range tests {
 		got := launcher.GetDefaultSystemChromeDirs(tt.goos)
 		for _, want := range tt.expected {
@@ -591,9 +591,6 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 			}
 		}
 	}
-	os.Unsetenv("LocalAppData")
-	os.Unsetenv("ProgramFiles")
-	os.Unsetenv("ProgramFiles(x86)")
 }
 
 func TestResolveChromePaths(t *testing.T) {
