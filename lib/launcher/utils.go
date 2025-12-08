@@ -15,9 +15,10 @@ var inContainer = utils.InContainer
 
 func toHTTP(u url.URL) *url.URL {
 	newURL := u
-	if newURL.Scheme == "ws" {
+	switch newURL.Scheme {
+	case "ws":
 		newURL.Scheme = "http"
-	} else if newURL.Scheme == "wss" {
+	case "wss":
 		newURL.Scheme = "https"
 	}
 	return &newURL
@@ -25,9 +26,10 @@ func toHTTP(u url.URL) *url.URL {
 
 func toWS(u url.URL) *url.URL {
 	newURL := u
-	if newURL.Scheme == "http" {
+	switch newURL.Scheme {
+	case "http":
 		newURL.Scheme = "ws"
-	} else if newURL.Scheme == "https" {
+	case "https":
 		newURL.Scheme = "wss"
 	}
 	return &newURL

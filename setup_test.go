@@ -34,7 +34,7 @@ func init() {
 
 	utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
 
-	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	b, err := launcher.NewBrowser()
 	utils.E(err)
 	b.MustGet()
 }

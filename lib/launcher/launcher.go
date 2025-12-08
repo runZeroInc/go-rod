@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -35,6 +34,7 @@ type Launcher struct {
 	parser  *URLParser
 	pid     int
 	exit    chan struct{}
+	dir     string
 
 	isLaunched int32 // zero means not launched
 }
@@ -44,11 +44,11 @@ type Launcher struct {
 // UserDataDir will use OS tmp dir by default, this folder will usually be cleaned up by the OS after reboot.
 // It will auto download the browser binary according to the current platform,
 // check [Launcher.Bin] and [Launcher.Revision] for more info.
-func New() (*Launcher, error) {
+func New(opts ...BrowserOption) (*Launcher, error) {
 	var err error
 	dir := defaults.Dir
 	if dir == "" {
-		dir, err = os.MkdirTemp(DefaultUserDataDirPrefix, "go-rod-launcher-*")
+		dir, err = os.MkdirTemp("", "go-rod-launcher-*")
 		if err != nil {
 			return nil, fmt.Errorf("mktemp user data dir: %w", err)
 		}
@@ -107,7 +107,7 @@ func New() (*Launcher, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	browser, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
+	browser, err := NewBrowser(opts...)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -121,11 +121,12 @@ func New() (*Launcher, error) {
 		browser:   browser,
 		parser:    NewURLParser(),
 		logger:    io.Discard,
+		dir:       dir,
 	}, nil
 }
 
-func NewMust() *Launcher {
-	l, err := New()
+func NewMust(opts ...BrowserOption) *Launcher {
+	l, err := New(opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -135,11 +136,11 @@ func NewMust() *Launcher {
 // NewUserMode is a preset to enable reusing current user data. Useful for automation of personal browser.
 // If you see any error, it may because you can't launch debug port for existing browser, the solution is to
 // completely close the running browser. Unfortunately, there's no API for rod to tell it automatically yet.
-func NewUserMode() (*Launcher, error) {
+func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	bin, _ := LookPath()
 
-	b, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
+	b, err := NewBrowser(opts...)
 	if err != nil {
 		cancel()
 		panic(err)
@@ -252,7 +253,7 @@ func (l *Launcher) Bin(path string) *Launcher {
 
 // Revision of the browser to auto download.
 func (l *Launcher) Revision(rev int) *Launcher {
-	l.browser.Revision = rev
+	l.browser.revision = rev
 	return l
 }
 

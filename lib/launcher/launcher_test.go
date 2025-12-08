@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -289,7 +288,7 @@ func Test_ResolveDownloadURL(t *testing.T) {
 }
 
 func Test_ResolveDownloader(t *testing.T) {
-	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	b, err := launcher.NewBrowser()
 	t.Errorf("browser: %+v", b)
 	if err != nil {
 		t.Fatalf("NewBrowser() error = %v", err)

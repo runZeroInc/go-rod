@@ -3,8 +3,6 @@ package launcher_test
 import (
 	"os"
 	"os/exec"
-	"runtime"
-	"testing"
 
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
@@ -24,16 +22,16 @@ func Example_print_browser_CLI_output() {
 	rod.New().ControlURL(u).MustConnect()
 }
 
-func Example_custom_launch(t *testing.T) {
+func Example_custom_launch() {
 	// get the browser executable path
-	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	b, err := launcher.NewBrowser()
 	utils.E(err)
 	path := b.MustGet()
 
 	// use the FormatArgs to construct args, this line is optional, you can construct the args manually
 	l, err := launcher.New()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	args := l.FormatArgs()
 

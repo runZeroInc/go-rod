@@ -126,7 +126,7 @@ func TestError(t *testing.T) {
 	g.True(cdpErr.Is(&cdpErr))
 
 	g.Panic(func() {
-		cdp.MustStartWithURL(context.Background(), "", nil)
+		cdp.MustStartWithURL(t.Context(), "", nil)
 	})
 }
 

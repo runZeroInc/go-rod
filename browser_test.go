@@ -3,10 +3,12 @@ package rod_test
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 func TestIncognito(t *testing.T) {
@@ -492,4 +495,155 @@ func TestBrowserConnectConflict(t *testing.T) {
 	g.Panic(func() {
 		rod.New().Client(&cdp.Client{}).ControlURL("test").MustConnect()
 	})
+}
+
+func TestGetDefaultSystemChromeExecutables(t *testing.T) {
+	tests := []struct {
+		goos     string
+		expected []string
+	}{
+		{
+			goos: "windows",
+			expected: []string{
+				"chrome.exe", "chromium.exe", "msedge.exe",
+			},
+		},
+		{
+			goos: "darwin",
+			expected: []string{
+				"Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+				"Google Chrome.app/Contents/MacOS/Google Chrome",
+				"Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta",
+				"Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+				"Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
+				"Chromium.app/Contents/MacOS/Chromium",
+				"Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+				"chrome", "chromium", "microsoft-edge",
+			},
+		},
+		{
+			goos: "linux",
+			expected: []string{
+				"chrome", "google-chrome", "google-chrome-beta", "google-chrome-canary", "google-chrome-unstable",
+				"chromium", "chromium-browser", "microsoft-edge",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		got := launcher.GetDefaultSystemChromeExecutables(tt.goos)
+		for _, want := range tt.expected {
+			found := false
+			for _, g := range got {
+				if g == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("GOOS=%s: expected executable %q in list, got %v", tt.goos, want, got)
+			}
+		}
+	}
+}
+
+func TestGetDefaultSystemChromeDirs(t *testing.T) {
+	tests := []struct {
+		goos     string
+		expected []string
+	}{
+		{
+			goos:     "darwin",
+			expected: []string{"/Applications", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"},
+		},
+		{
+			goos: "linux",
+			expected: []string{
+				"/opt/google/chrome", "/opt/google/chrome-beta", "/opt/google/chrome-canary", "/opt/google/chrome-unstable",
+				"/usr/bin", "/usr/local/bin",
+				"/data/data/com.termux/files/usr/bin",
+				"/opt/microsoft/msedge",
+			},
+		},
+		{
+			goos: "windows",
+			expected: []string{
+				// Only check that some known suffixes are present, since env-dependent
+				// paths can't be reliably checked in unit tests.
+				`Google\Chrome\Application`,
+				`Microsoft\Edge\Application`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		got := launcher.GetDefaultSystemChromeDirs(tt.goos)
+		for _, want := range tt.expected {
+			found := false
+			for _, g := range got {
+				if strings.Contains(g, want) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("GOOS=%s: expected dir containing %q in list, got %v", tt.goos, want, got)
+			}
+		}
+	}
+}
+
+func TestResolveChromePaths(t *testing.T) {
+	// Use a dummy logger to avoid output
+	logger := logrus.New()
+	logger.Out = io.Discard
+
+	// Case 1: UseChromePath set
+	b := &launcher.Browser{
+		UseChromePath: "/custom/path/to/chrome",
+		Logger:        logger,
+	}
+	paths := b.ResolveChromePaths("darwin")
+	if len(paths) != 1 || paths[0] != "/custom/path/to/chrome" {
+		t.Errorf("expected only custom path, got %v", paths)
+	}
+
+	// Case 2: UseSystemChrome set
+	b = &launcher.Browser{
+		UseSystemChrome: true,
+		Logger:          logger,
+		OS:              "linux",
+	}
+	paths = b.ResolveChromePaths("linux")
+	foundSystem := false
+	for _, p := range launcher.GetDefaultSystemChromeDirs("linux") {
+		for _, got := range paths {
+			if got == p {
+				foundSystem = true
+				break
+			}
+		}
+	}
+	if !foundSystem {
+		t.Errorf("expected system chrome dirs in paths, got %v", paths)
+	}
+
+	// Case 3: Neither set, should include BinPath
+	b = &launcher.Browser{
+		Logger: logger,
+		OS:     "darwin",
+		Arch:   "amd64",
+	}
+	paths = b.ResolveChromePaths("darwin")
+	binPath := b.BinPath()
+	foundBin := false
+	for _, p := range paths {
+		if p == binPath {
+			foundBin = true
+			break
+		}
+	}
+	if !foundBin {
+		t.Errorf("expected BinPath %q in paths, got %v", binPath, paths)
+	}
 }

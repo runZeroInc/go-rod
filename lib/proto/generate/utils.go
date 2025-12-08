@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/runZeroInc/go-rod/lib/launcher"
@@ -15,7 +14,7 @@ import (
 )
 
 func getSchema() (gson.JSON, error) {
-	b, err := launcher.NewBrowser(runtime.GOOS, runtime.GOARCH)
+	b, err := launcher.NewBrowser()
 	if err != nil {
 		return gson.JSON{}, err
 	}
