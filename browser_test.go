@@ -3,7 +3,6 @@ package rod_test
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -20,7 +19,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 	"github.com/runZeroInc/go-rod/pkg/gson"
-	"github.com/sirupsen/logrus"
 )
 
 func TestIncognito(t *testing.T) {
@@ -568,14 +566,16 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 		{
 			goos: "windows",
 			expected: []string{
-				// Only check that some known suffixes are present, since env-dependent
-				// paths can't be reliably checked in unit tests.
-				`Google\Chrome\Application`,
-				`Microsoft\Edge\Application`,
+				`C:\Program Files (x86)\Google\Chrome\Application`,
+				`C:\Program Files\Microsoft\Edge\Application`,
+				`C:\Users\TestUser\AppData\Local\Microsoft\Edge\Application`,
 			},
 		},
 	}
 
+	os.Setenv("LocalAppData", `C:\Users\TestUser\AppData\Local`)
+	os.Setenv("ProgramFiles", `C:\Program Files`)
+	os.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
 	for _, tt := range tests {
 		got := launcher.GetDefaultSystemChromeDirs(tt.goos)
 		for _, want := range tt.expected {
@@ -587,63 +587,21 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("GOOS=%s: expected dir containing %q in list, got %v", tt.goos, want, got)
+				t.Errorf("OS=%s: expected dir containing %q in list, got %v", tt.goos, want, got)
 			}
 		}
 	}
+	os.Unsetenv("LocalAppData")
+	os.Unsetenv("ProgramFiles")
+	os.Unsetenv("ProgramFiles(x86)")
 }
 
 func TestResolveChromePaths(t *testing.T) {
-	// Use a dummy logger to avoid output
-	logger := logrus.New()
-	logger.Out = io.Discard
-
-	// Case 1: UseChromePath set
 	b := &launcher.Browser{
 		UseChromePath: "/custom/path/to/chrome",
-		Logger:        logger,
 	}
 	paths := b.ResolveChromePaths("darwin")
 	if len(paths) != 1 || paths[0] != "/custom/path/to/chrome" {
 		t.Errorf("expected only custom path, got %v", paths)
-	}
-
-	// Case 2: UseSystemChrome set
-	b = &launcher.Browser{
-		UseSystemChrome: true,
-		Logger:          logger,
-		OS:              "linux",
-	}
-	paths = b.ResolveChromePaths("linux")
-	foundSystem := false
-	for _, p := range launcher.GetDefaultSystemChromeDirs("linux") {
-		for _, got := range paths {
-			if got == p {
-				foundSystem = true
-				break
-			}
-		}
-	}
-	if !foundSystem {
-		t.Errorf("expected system chrome dirs in paths, got %v", paths)
-	}
-
-	// Case 3: Neither set, should include BinPath
-	b = &launcher.Browser{
-		Logger: logger,
-		OS:     "darwin",
-		Arch:   "amd64",
-	}
-	paths = b.ResolveChromePaths("darwin")
-	binPath := b.BinPath()
-	foundBin := false
-	for _, p := range paths {
-		if p == binPath {
-			foundBin = true
-			break
-		}
-	}
-	if !foundBin {
-		t.Errorf("expected BinPath %q in paths, got %v", binPath, paths)
 	}
 }

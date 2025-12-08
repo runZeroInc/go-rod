@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/sirupsen/logrus"
 )
@@ -214,14 +215,6 @@ func downloadJSON(url string, target any) error {
 	return nil
 }
 
-// DefaultBrowserDir for downloaded browser. For unix is "$HOME/.cache/rod/browser",
-// for Windows it's "%APPDATA%\rod\browser".
-var DefaultBrowserDir = filepath.Join(map[string]string{
-	"windows": os.Getenv("APPDATA"),
-	"darwin":  filepath.Join(os.Getenv("HOME"), ".cache"),
-	"linux":   filepath.Join(os.Getenv("HOME"), ".cache"),
-}[runtime.GOOS], "rod", "browser")
-
 // Browser is a helper to download browser smartly.
 type Browser struct {
 	Context                context.Context
@@ -317,8 +310,10 @@ func WithUseSystemChrome(use bool) BrowserOption {
 // NewBrowser defines a Browser with user-provided options
 func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	b := &Browser{
-		Context: context.Background(),
-		RootDir: DefaultBrowserDir,
+		UseAutomaticInstall:    true,
+		UseSystemChrome:        true,
+		UseAutomaticValidation: true,
+		Context:                context.Background(),
 		HTTPClient: &http.Client{
 			Timeout: 15 * time.Minute,
 		},
@@ -346,13 +341,29 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 		}
 	}
 
+	if b.RootDir == "" {
+		cacheDir, err := GetDefaultBrowserCacheDir(b.OS)
+		if err != nil {
+			return nil, err
+		}
+		b.RootDir = cacheDir
+	}
+
+	// Prevent fallback if an explicit path is set
+	if b.UseChromePath != "" {
+		b.UseSystemChrome = false
+		b.UseAutomaticInstall = false
+	}
+
 	if b.UseAutomaticValidation {
-		if err := b.Validate(); err != nil {
+		cpath, err := b.Validate()
+		if err != nil {
 			if !b.UseAutomaticInstall {
 				return nil, err
 			}
 			b.Logger.Errorf("browser validation failed: %v", err)
 		}
+		b.Logger.Infof("validated existing browser at %s", cpath)
 	}
 
 	if b.UseAutomaticInstall {
@@ -384,31 +395,36 @@ func NewBrowserMust(opts ...BrowserOption) *Browser {
 	return b
 }
 
-// Dir to download the browser.
+// DownloadDir returns the browser download directory for this revision.
 func (b *Browser) DownloadDir() string {
 	return filepath.Join(b.RootDir, fmt.Sprintf("chromium-%d", b.revision))
 }
 
-var BinPaths = map[string]string{
-	//"darwin":  "Chromium.app/Contents/MacOS/Chromium",
-	"darwin":  "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-	"linux":   "chrome",
-	"windows": "chrome.exe",
-}
-
-// BinPath to download the browser executable.
+// BinPath returns the browser binary path.
 func (b *Browser) BinPath() string {
-	bin, ok := BinPaths[b.OS]
-	if !ok {
-		return ""
-	}
-	return filepath.Join(b.DownloadDir(), filepath.FromSlash(bin))
+	return b.UseChromePath
 }
 
 // Download the browser to [Browser.BinPath].
 func (b *Browser) Download() error {
-	b.Logger.Printf("downloading chromium revision %d from %s to %s (%s-%s)", b.revision, b.downloadURL, b.DownloadDir(), b.OS, b.Arch)
-	if err := os.MkdirAll(b.DownloadDir(), 0o755); err != nil {
+	downloadDir := b.DownloadDir()
+	b.Logger.Printf("downloading chrome revision %d from %s to %s (%s-%s)", b.revision, b.downloadURL, downloadDir, b.OS, b.Arch)
+
+	fl := flock.New(downloadDir + ".lock")
+	defer func() {
+		err := fl.Unlock()
+		if err != nil {
+			b.Logger.Errorf("failed to unlock flock: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	ok, err := fl.TryLockContext(ctx, time.Minute)
+	if !ok {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+
+	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
@@ -498,7 +514,13 @@ func (b *Browser) Download() error {
 		_ = outFile.Close()
 	}
 
-	b.Logger.Println("extraction completed")
+	latestFile := filepath.Join(downloadDir, "LATEST.txt")
+	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.revision)), 0o644)
+	if err != nil {
+		b.Logger.Errorf("failed to write %s: %v", latestFile, err)
+	}
+
+	b.Logger.Printf("installed revision %d", b.revision)
 
 	return nil
 }
@@ -506,9 +528,14 @@ func (b *Browser) Download() error {
 // Get is a smart helper to get the browser executable path.
 // If [Browser.BinPath] is not valid it will auto download the browser to [Browser.BinPath].
 func (b *Browser) Get() (string, error) {
-	if b.Validate() == nil {
-		return b.BinPath(), nil
+	path, err := b.Validate()
+	if err == nil {
+		return path, nil
 	}
+	if !b.UseAutomaticInstall {
+		return "", err
+	}
+	err = b.Download()
 
 	return b.BinPath(), b.Download()
 }
@@ -521,47 +548,69 @@ func (b *Browser) MustGet() string {
 }
 
 // Validate identifies and validates the browser binary.
-func (b *Browser) Validate() error {
+func (b *Browser) Validate() (string, error) {
 	chromePaths := b.ResolveChromePaths(b.OS)
 	for _, p := range chromePaths {
-		b.Logger.Printf("validating browser at %s", p)
-		if err := b.validateAtPath(p); err == nil {
-			b.Logger.Printf("found valid browser at %s", p)
-			b.UseChromePath = p
-			return nil
-		} else {
-			b.Logger.Printf("invalid browser at %s: %v", p, err)
+		st, err := os.Stat(p)
+		if err != nil {
+			continue
 		}
+		if st.IsDir() {
+			b.Logger.Errorf("skipping directory path %s", p)
+			continue
+		}
+		b.Logger.Printf("validating browser at %s", p)
+		err = b.validateAtPath(p)
+		if err == nil {
+			b.Logger.Printf("found valid browser at %s", p)
+			return p, nil
+		}
+		b.Logger.Printf("invalid browser at %s: %v", p, err)
 	}
-	return fmt.Errorf("no valid browser found")
+	return "", fmt.Errorf("no valid browser found")
 }
 
 // ResolveChromePaths returns a list of possibly usable Chrome executables.
 func (b *Browser) ResolveChromePaths(srcOS string) []string {
 	paths := []string{}
-
 	// If a path is specified, only use this path and don't fall back
 	if b.UseChromePath != "" {
 		paths = []string{b.UseChromePath}
 	} else {
-		// Check the go-rod browser cache
-		if cacheDir, err := GetDefaultBrowserCacheDir(srcOS); err == nil {
-			latestRev, err := os.ReadFile(filepath.Join(cacheDir, "LATEST.txt"))
-			if err == nil {
-				latestRevInt, err := strconv.Atoi(strings.TrimSpace(string(latestRev)))
-				if err == nil && latestRevInt > 0 {
-					paths = append(paths, filepath.Join(cacheDir, fmt.Sprintf("chromium-%d", latestRevInt)))
-				}
-			}
-		}
+		paths = append(paths, ResolveChromePathsFromCache(srcOS)...)
 		// Check the common system chrome paths
 		if b.UseSystemChrome {
-			paths = append(paths, GetDefaultSystemChromeDirs(srcOS)...)
+			paths = append(paths, ResolveChromePathsFromSystem(srcOS)...)
 		}
 	}
+	return paths
+}
 
-	paths = append(paths, b.BinPath())
+// ResolveChromePathsFromCache returns a list of cached Chrome executable paths.
+func ResolveChromePathsFromCache(srcOS string) []string {
+	paths := []string{}
+	cacheDir, err := GetDefaultBrowserCacheDir(srcOS)
+	if err != nil {
+		return paths
+	}
+	latestRev, err := os.ReadFile(filepath.Join(cacheDir, "LATEST.txt"))
+	if err == nil {
+		latestRevInt, err := strconv.Atoi(strings.TrimSpace(string(latestRev)))
+		if err == nil && latestRevInt > 0 {
+			paths = append(paths, filepath.Join(cacheDir, fmt.Sprintf("chromium-%d", latestRevInt)))
+		}
+	}
+	return paths
+}
 
+// ResolveChromePathsFromSystem returns a list of system Chrome executable paths.
+func ResolveChromePathsFromSystem(srcOS string) []string {
+	paths := []string{}
+	for _, p := range GetDefaultSystemChromeDirs(srcOS) {
+		for _, exe := range GetDefaultSystemChromeExecutables(srcOS) {
+			paths = append(paths, filepath.Join(p, exe))
+		}
+	}
 	return paths
 }
 
@@ -597,7 +646,11 @@ func GetDefaultSystemChromeDirs(srcOS string) []string {
 				continue
 			}
 			for _, appName := range appNames {
-				paths = append(paths, filepath.Join(dirPath, appName))
+				fileSep := `/`
+				if srcOS == "windows" {
+					fileSep = `\`
+				}
+				paths = append(paths, strings.Join([]string{dirPath, appName}, fileSep))
 			}
 		}
 	}
@@ -629,16 +682,20 @@ func GetDefaultSystemChromeExecutables(srcOS string) []string {
 }
 
 func (b *Browser) validateAtPath(path string) error {
-	_, err := os.Stat(path)
-	if err != nil {
-		return err
+
+	validateArgs := []string{
+		"--headless",
+		"--use-mock-keychain", "--disable-dev-shm-usage",
+		"--disable-gpu", "--dump-dom", "about:blank",
+		"--no-first-run", "--no-default-browser-check",
 	}
 
-	// TODO: Handle privilege dropping with the sandbox on Linux (prepare a new temp dir)
+	// TODO: Try dropping privileges with sandbox on Linux instead
+	if os.Geteuid() == 0 && runtime.GOOS == "linux" {
+		validateArgs = append([]string{"--no-sandbox"}, validateArgs...)
+	}
 
-	cmd := exec.Command(path, "--headless", "--no-sandbox",
-		"--use-mock-keychain", "--disable-dev-shm-usage",
-		"--disable-gpu", "--dump-dom", "about:blank")
+	cmd := exec.Command(path, validateArgs...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(out), "error while loading shared libraries") {
@@ -652,6 +709,24 @@ func (b *Browser) validateAtPath(path string) error {
 	}
 
 	return nil
+}
+
+func getChromeEnvironments(srcOS string) []string {
+	res := []string{}
+	switch srcOS {
+	case "windows":
+		envs := []string{"PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"}
+		for _, env := range envs {
+			if dir := os.Getenv(env); dir != "" {
+				res = append(res, dir)
+			}
+		}
+	default:
+		if homeDir := os.Getenv("HOME"); homeDir != "" {
+			res = append(res, homeDir)
+		}
+	}
+	return res
 }
 
 func getDefaultHomeDir(srcOS string) []string {
@@ -673,6 +748,11 @@ func getDefaultHomeDir(srcOS string) []string {
 }
 
 func GetDefaultBrowserCacheDir(srcOS string) (string, error) {
+	if cacheDir := os.Getenv("ROD_BROWSER_CACHE"); cacheDir != "" {
+		if st, err := os.Stat(cacheDir); err == nil && st.IsDir() {
+			return cacheDir, nil
+		}
+	}
 	pathSuffix := []string{"rod", "browser"}
 	if cacheDir := os.Getenv("XDG_CACHE_HOME"); cacheDir != "" {
 		if st, err := os.Stat(cacheDir); err == nil && st.IsDir() {

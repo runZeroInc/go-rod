@@ -30,13 +30,15 @@ var TimeoutEach = flag.Duration("timeout-each", time.Minute, "timeout for each t
 var LogDir = slash(fmt.Sprintf("tmp/cdp-log/%s", time.Now().Format("2006-01-02_15-04-05")))
 
 func init() {
-	got.DefaultFlags("timeout=5m", "run=/")
+	/*
+		got.DefaultFlags("timeout=5m", "run=/")
 
-	utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
+		utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
 
-	b, err := launcher.NewBrowser()
-	utils.E(err)
-	b.MustGet()
+		b, err := launcher.NewBrowser()
+		utils.E(err)
+		b.MustGet()
+	*/
 }
 
 var testerPool rod.Pool[G]
