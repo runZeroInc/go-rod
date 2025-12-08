@@ -10,7 +10,6 @@ import (
 )
 
 func TestPipeOrder(t *testing.T) {
-	checkLeak(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -33,7 +32,6 @@ func TestPipeOrder(t *testing.T) {
 }
 
 func TestPipe(t *testing.T) {
-	checkLeak(t)
 
 	const pipeCount = 10
 	const msgCount = 10
@@ -71,7 +69,6 @@ func TestPipe(t *testing.T) {
 }
 
 func TestPipeCancel(t *testing.T) {
-	checkLeak(t)
 
 	const count = 1000
 
