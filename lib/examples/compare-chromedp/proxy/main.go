@@ -21,7 +21,7 @@ func main() {
 	}))
 	defer s.Close()
 
-	url := launcher.New().Proxy(p.URL).Set("proxy-bypass-list", "<-loopback>").MustLaunch()
+	url := launcher.NewMust().Proxy(p.URL).Set("proxy-bypass-list", "<-loopback>").MustLaunch()
 
 	browser := rod.New().ControlURL(url).MustConnect()
 	defer browser.MustClose()

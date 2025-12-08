@@ -20,7 +20,7 @@ import (
 func main() {
 	// Make sure you have closed your browser completely, UserMode can't control a browser that is not launched by it.
 	// Launches a new browser with the "new user mode" option, and returns the URL to control that browser.
-	wsURL := launcher.NewUserMode().MustLaunch()
+	wsURL := launcher.NewUserModeMust().MustLaunch()
 
 	browser := rod.New().ControlURL(wsURL).MustConnect().NoDefaultDevice()
 

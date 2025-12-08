@@ -48,7 +48,7 @@ func TestLaunchOptions(t *testing.T) {
 		inContainer = utils.InContainer
 	}()
 
-	l := New()
+	l := NewMust()
 
 	g.False(l.Has(flags.Headless))
 
@@ -60,13 +60,13 @@ func TestLaunchOptions(t *testing.T) {
 func TestGetURLErr(t *testing.T) {
 	g := setup(t)
 
-	l := New()
+	l := NewMust()
 
 	l.ctxCancel()
 	_, err := l.getURL()
 	g.Err(err)
 
-	l = New()
+	l = NewMust()
 	l.parser.lock.Lock()
 	l.parser.Buffer = "err"
 	l.parser.lock.Unlock()

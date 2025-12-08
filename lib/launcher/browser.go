@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -227,8 +227,8 @@ type Browser struct {
 	// RootDir to download different browser versions.
 	RootDir string
 
-	// Log to print output
-	Logger utils.Logger
+	// Logger to use
+	Logger *logrus.Logger
 
 	// Revision
 	Revision int
@@ -245,7 +245,7 @@ func NewBrowser(srcOS, srcArch string) (*Browser, error) {
 	b := &Browser{
 		Context: context.Background(),
 		RootDir: DefaultBrowserDir,
-		Logger:  log.New(os.Stdout, "[launcher.Browser]", log.LstdFlags),
+		Logger:  logrus.New(),
 		OS:      srcOS,
 		Arch:    srcArch,
 		HTTPClient: &http.Client{
@@ -272,6 +272,15 @@ func NewBrowser(srcOS, srcArch string) (*Browser, error) {
 	return b, nil
 }
 
+// NewBrowserMust with default values.
+func NewBrowserMust(srcOS, srcArch string) *Browser {
+	b, err := NewBrowser(srcOS, srcArch)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 // Dir to download the browser.
 func (lc *Browser) DownloadDir() string {
 	return filepath.Join(lc.RootDir, fmt.Sprintf("chromium-%d", lc.Revision))
@@ -294,7 +303,7 @@ func (lc *Browser) BinPath() string {
 
 // Resolve and download the correct URL for the platform
 func (lc *Browser) Download() error {
-	lc.Logger.Println(fmt.Sprintf("downloading chromium revision %d from %s to %s (%s-%s)", lc.Revision, lc.DownloadURL, lc.DownloadDir(), lc.OS, lc.Arch))
+	lc.Logger.Printf("downloading chromium revision %d from %s to %s (%s-%s)", lc.Revision, lc.DownloadURL, lc.DownloadDir(), lc.OS, lc.Arch)
 	if err := os.MkdirAll(lc.DownloadDir(), 0o755); err != nil {
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
@@ -318,7 +327,7 @@ func (lc *Browser) Download() error {
 	if err != nil {
 		return fmt.Errorf("failed to download zip: %w", err)
 	}
-	lc.Logger.Println(fmt.Sprintf("downloaded %d bytes\n", n))
+	lc.Logger.Printf("downloaded %d bytes\n", n)
 	_ = tmpFile.Close()
 	_ = res.Body.Close()
 
@@ -338,15 +347,20 @@ func (lc *Browser) Download() error {
 	}
 
 	for _, f := range zr.File {
-		// Trim the first part of the name from the path
-		dname, trimmed, ok := strings.Cut(f.Name, "/")
-		if ok {
-			dname = trimmed
+		// Replace backslashes with forward slashes out of paranoia
+		dname, err := cleanZipFileName(f.Name, 1)
+		if err != nil {
+			lc.Logger.Printf("skipping extracting of %s: %v", f.Name, err)
+			continue
 		}
-		dname = filepath.Clean(dname)
-		fpath := filepath.Join(lc.DownloadDir(), dname)
 
-		lc.Logger.Println(fmt.Sprintf("extracting %s to %s\n", f.Name, fpath))
+		fpath, err := filepath.Abs(filepath.Join(lc.DownloadDir(), dname))
+		if err != nil {
+			lc.Logger.Printf("failed to get absolute path for %q: %v", dname, err)
+			continue
+		}
+
+		lc.Logger.Printf("extracting %q to %q\n", f.Name, fpath)
 
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(fpath, 0o755); err != nil {
@@ -508,4 +522,21 @@ func expandWindowsExePaths(list ...string) []string {
 	}
 
 	return newList
+}
+
+// cleanZipFileName cleans the zip file name trimming traversal sequences and removing
+// the specified number of leading path segments.
+func cleanZipFileName(fname string, depth int) (string, error) {
+	fname = strings.ReplaceAll(fname, "\\", "/")
+	bits := []string{}
+	for _, b := range strings.Split(fname, "/") {
+		if b == "" || b == "." || b == ".." {
+			continue
+		}
+		bits = append(bits, b)
+	}
+	if len(bits) <= depth {
+		return "", fmt.Errorf("unexpected file name in zip: %s", fname)
+	}
+	return filepath.Join(bits[depth:]...), nil
 }

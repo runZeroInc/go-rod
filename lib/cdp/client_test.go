@@ -26,7 +26,7 @@ func TestBasic(t *testing.T) {
 
 	ctx := g.Context()
 
-	client := cdp.New().Logger(defaults.CDP).Start(cdp.MustConnectWS(launcher.New().MustLaunch()))
+	client := cdp.New().Logger(defaults.CDP).Start(cdp.MustConnectWS(launcher.NewMust().MustLaunch()))
 
 	defer func() {
 		_, _ = client.Call(ctx, "", "Browser.close", nil)
@@ -136,7 +136,7 @@ func TestCrash(t *testing.T) {
 
 	ctx := g.Context()
 
-	client := cdp.MustStartWithURL(ctx, launcher.New().MustLaunch(), nil)
+	client := cdp.MustStartWithURL(ctx, launcher.NewMust().MustLaunch(), nil)
 
 	go func() {
 		for range client.Event() {

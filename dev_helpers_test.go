@@ -41,7 +41,7 @@ func TestMonitor(t *testing.T) {
 func TestMonitorErr(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.New()
+	l := launcher.NewMust()
 	u := l.MustLaunch()
 	defer l.Kill()
 

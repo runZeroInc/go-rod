@@ -464,7 +464,7 @@ func TestOldBrowser(t *testing.T) {
 	t.Skip()
 
 	g := setup(t)
-	u := launcher.New().Revision(686378).MustLaunch()
+	u := launcher.NewMust().Revision(686378).MustLaunch()
 	b := rod.New().ControlURL(u).MustConnect()
 	g.Cleanup(b.MustClose)
 	res, err := proto.BrowserGetVersion{}.Call(b)
@@ -475,7 +475,7 @@ func TestOldBrowser(t *testing.T) {
 func TestBrowserLostConnection(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.New()
+	l := launcher.NewMust()
 	p := rod.New().ControlURL(l.MustLaunch()).MustConnect().MustPage(g.blank())
 
 	go func() {

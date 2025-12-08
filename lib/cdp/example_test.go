@@ -15,7 +15,7 @@ func ExampleClient() {
 	ctx := context.Background()
 
 	// launch a browser
-	url := launcher.New().MustLaunch()
+	url := launcher.NewMust().MustLaunch()
 
 	// create a controller
 	client := cdp.New().Start(cdp.MustConnectWS(url))
@@ -44,7 +44,7 @@ func ExampleClient() {
 }
 
 func Example_customize_cdp_log() {
-	ws := cdp.MustConnectWS(launcher.New().MustLaunch())
+	ws := cdp.MustConnectWS(launcher.NewMust().MustLaunch())
 
 	cdp.New().
 		Logger(utils.Log(func(args ...interface{}) {

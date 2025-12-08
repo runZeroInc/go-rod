@@ -150,7 +150,11 @@ func (b *Browser) Connect() error {
 		u := b.controlURL
 		if u == "" {
 			var err error
-			u, err = launcher.New().Context(b.ctx).Launch()
+			l, err := launcher.New()
+			if err != nil {
+				return err
+			}
+			u, err = l.Context(b.ctx).Launch()
 			if err != nil {
 				return err
 			}

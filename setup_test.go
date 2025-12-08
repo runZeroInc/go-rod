@@ -91,7 +91,7 @@ func newTesterPool() rod.Pool[G] {
 }
 
 func newTester() *G {
-	u := launcher.New().Set("proxy-bypass-list", "<-loopback>").NoSandbox(true).MustLaunch()
+	u := launcher.NewMust().Set("proxy-bypass-list", "<-loopback>").NoSandbox(true).MustLaunch()
 
 	mc := newMockClient(u)
 

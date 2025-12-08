@@ -20,7 +20,7 @@ import (
 )
 
 // DefaultUserDataDirPrefix ...
-var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "rod", "user-data")
+var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "go-rod-user-data")
 
 // Launcher is a helper to launch browser binary smartly.
 type Launcher struct {
@@ -44,10 +44,14 @@ type Launcher struct {
 // UserDataDir will use OS tmp dir by default, this folder will usually be cleaned up by the OS after reboot.
 // It will auto download the browser binary according to the current platform,
 // check [Launcher.Bin] and [Launcher.Revision] for more info.
-func New() *Launcher {
+func New() (*Launcher, error) {
+	var err error
 	dir := defaults.Dir
 	if dir == "" {
-		dir = filepath.Join(DefaultUserDataDirPrefix, utils.RandString(8))
+		dir, err = os.MkdirTemp(DefaultUserDataDirPrefix, "go-rod-launcher-*")
+		if err != nil {
+			return nil, fmt.Errorf("mktemp user data dir: %w", err)
+		}
 	}
 
 	defaultFlags := map[flags.Flag][]string{
@@ -104,7 +108,10 @@ func New() *Launcher {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	browser, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
-	utils.E(err)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 
 	return &Launcher{
 		ctx:       ctx,
@@ -114,18 +121,29 @@ func New() *Launcher {
 		browser:   browser,
 		parser:    NewURLParser(),
 		logger:    io.Discard,
+	}, nil
+}
+
+func NewMust() *Launcher {
+	l, err := New()
+	if err != nil {
+		panic(err)
 	}
+	return l
 }
 
 // NewUserMode is a preset to enable reusing current user data. Useful for automation of personal browser.
 // If you see any error, it may because you can't launch debug port for existing browser, the solution is to
 // completely close the running browser. Unfortunately, there's no API for rod to tell it automatically yet.
-func NewUserMode() *Launcher {
+func NewUserMode() (*Launcher, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	bin, _ := LookPath()
 
 	b, err := NewBrowser(runtime.GOOS, runtime.GOARCH)
-	utils.E(err)
+	if err != nil {
+		cancel()
+		panic(err)
+	}
 	return &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
@@ -138,18 +156,37 @@ func NewUserMode() *Launcher {
 		exit:    make(chan struct{}),
 		parser:  NewURLParser(),
 		logger:  io.Discard,
+	}, nil
+}
+
+func NewUserModeMust() *Launcher {
+	l, err := New()
+	if err != nil {
+		panic(err)
 	}
+	return l
 }
 
 // NewAppMode is a preset to run the browser like a native application.
 // The u should be a URL.
-func NewAppMode(u string) *Launcher {
-	l := New()
+func NewAppMode(u string) (*Launcher, error) {
+	l, err := New()
+	if err != nil {
+		return nil, err
+	}
 	l.Set(flags.App, u).
 		Set(flags.Env, "GOOGLE_API_KEY=no").
 		Headless(false).
 		Delete("no-startup-window").
 		Delete("enable-automation")
+	return l, nil
+}
+
+func NewAppModeMust(u string) *Launcher {
+	l, err := NewAppMode(u)
+	if err != nil {
+		panic(err)
+	}
 	return l
 }
 

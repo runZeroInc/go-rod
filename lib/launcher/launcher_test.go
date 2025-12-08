@@ -24,7 +24,7 @@ var setup = got.Setup(nil)
 func TestLaunchUserMode(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.NewUserMode()
+	l := launcher.NewUserModeMust()
 	defer l.Kill()
 
 	l.Kill() // empty kill should do nothing
@@ -63,23 +63,23 @@ func TestLaunchUserMode(t *testing.T) {
 
 	url := l.MustLaunch()
 
-	g.Eq(url, launcher.NewUserMode().RemoteDebuggingPort(port).MustLaunch())
+	g.Eq(url, launcher.NewUserModeMust().RemoteDebuggingPort(port).MustLaunch())
 }
 
 func TestUserModeErr(t *testing.T) {
 	g := setup(t)
 
-	_, err := launcher.NewUserMode().RemoteDebuggingPort(48277).Bin("not-exists").Launch()
+	_, err := launcher.NewUserModeMust().RemoteDebuggingPort(48277).Bin("not-exists").Launch()
 	g.Err(err)
 
-	_, err = launcher.NewUserMode().RemoteDebuggingPort(58217).Bin("echo").Launch()
+	_, err = launcher.NewUserModeMust().RemoteDebuggingPort(58217).Bin("echo").Launch()
 	g.Err(err)
 }
 
 func TestAppMode(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.NewAppMode("http://example.com")
+	l := launcher.NewAppModeMust("http://example.com")
 
 	g.Eq(l.Get(flags.App), "http://example.com")
 }
@@ -95,13 +95,13 @@ func TestLaunchErr(t *testing.T) {
 	g := setup(t)
 
 	g.Panic(func() {
-		launcher.New().Bin("not-exists").MustLaunch()
+		launcher.NewMust().Bin("not-exists").MustLaunch()
 	})
 	g.Panic(func() {
-		launcher.New().Headless(false).Bin("not-exists").MustLaunch()
+		launcher.NewMust().Headless(false).Bin("not-exists").MustLaunch()
 	})
 	{
-		l := launcher.New().XVFB()
+		l := launcher.NewMust().XVFB()
 		_, _ = l.Launch()
 		l.Kill()
 	}
@@ -112,7 +112,10 @@ var testProfileDir = flag.Bool("test-profile-dir", false, "set it to test profil
 func TestProfileDir(t *testing.T) {
 	g := setup(t)
 
-	url := launcher.New().Headless(false).
+	l, err := launcher.New()
+	g.E(err)
+
+	url := l.Headless(false).
 		ProfileDir("").ProfileDir("test-profile-dir")
 
 	if !*testProfileDir {
@@ -166,7 +169,7 @@ fmQnyBe7dVU43NXfrQIDAQAB
 		keys = append(keys, pub)
 	}
 
-	l := launcher.New()
+	l := launcher.NewMust()
 
 	err := l.IgnoreCerts(keys)
 	if err != nil {
@@ -184,7 +187,7 @@ fmQnyBe7dVU43NXfrQIDAQAB
 func TestIgnoreCerts_InvalidCert(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.New()
+	l := launcher.NewMust()
 
 	err := l.IgnoreCerts([]crypto.PublicKey{nil})
 	if err == nil {
@@ -196,7 +199,7 @@ func TestLaunchMultiTimes(t *testing.T) {
 	g := setup(t)
 
 	// first time launch, success.
-	l := launcher.New()
+	l := launcher.NewMust()
 	u, e := l.Launch()
 	g.Neq(u, "")
 	g.E(e)

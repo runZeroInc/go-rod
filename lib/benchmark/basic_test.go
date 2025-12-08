@@ -18,7 +18,7 @@ func BenchmarkCleanup(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			launch := launcher.New().UserDataDir(filepath.Join("tmp", "cleanup", utils.RandString(8)))
+			launch := launcher.NewMust().UserDataDir(filepath.Join("tmp", "cleanup", utils.RandString(8)))
 			b.Cleanup(launch.Cleanup)
 
 			url := launch.MustLaunch()
