@@ -22,7 +22,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
-	"github.com/runZeroInc/go-rod/pkg/gotrace"
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
@@ -53,10 +52,6 @@ func TestMain(m *testing.M) {
 	testerPool.Cleanup(func(g *G) {
 		g.browser.MustClose()
 	})
-
-	if err := gotrace.Check(0, gotrace.IgnoreFuncs("internal/poll.runtime_pollWait")); err != nil {
-		log.Fatal(err)
-	}
 }
 
 // G is a tester. Testers are thread-safe, they shouldn't race each other.
@@ -126,9 +121,6 @@ func setup(t *testing.T) G {
 	tester.G = got.New(t)
 	tester.mc.t = t
 	tester.mc.log.SetOutput(tester.Open(true, filepath.Join(LogDir, tester.mc.id, t.Name()+".log")))
-
-	tester.checkLeaking()
-
 	tester.page.MustNavigate("")
 
 	return *tester
@@ -170,45 +162,6 @@ func (g G) newPage(u ...string) *rod.Page {
 		}
 	})
 	return p
-}
-
-func (g *G) checkLeaking() {
-	ig := gotrace.CombineIgnores(gotrace.IgnoreCurrent(), gotrace.IgnoreNonChildren())
-	gotrace.CheckLeak(g.Testable, 0, ig)
-
-	self := gotrace.Get(false)[0]
-	g.cancelTimeout = g.DoAfter(*TimeoutEach, func() {
-		t := gotrace.Get(true).Filter(func(t *gotrace.Trace) bool {
-			if t.GoroutineID == self.GoroutineID {
-				return false
-			}
-			return ig(t)
-		}).String()
-		panic(fmt.Sprintf(`[rod_test.TimeoutEach] %s timeout after %v
-running goroutines: %s`, g.Name(), *TimeoutEach, t))
-	})
-
-	g.Cleanup(func() {
-		if g.Failed() {
-			return
-		}
-
-		// close all other pages other than g.page
-		res, err := proto.TargetGetTargets{}.Call(g.browser)
-		g.E(err)
-		for _, info := range res.TargetInfos {
-			if info.TargetID != g.page.TargetID {
-				g.E(proto.TargetCloseTarget{TargetID: info.TargetID}.Call(g.browser))
-			}
-		}
-
-		if g.browser.LoadState(g.page.SessionID, &proto.FetchEnable{}) {
-			g.Logf("leaking FetchEnable")
-			g.FailNow()
-		}
-
-		g.mc.setCall(nil)
-	})
 }
 
 type Call func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error)

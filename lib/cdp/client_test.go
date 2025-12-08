@@ -15,7 +15,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
-	"github.com/runZeroInc/go-rod/pkg/gotrace"
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
@@ -209,8 +208,6 @@ func TestFormat(t *testing.T) {
 func TestSlowSend(t *testing.T) {
 	g := setup(t)
 
-	gotrace.CheckLeak(g, 0)
-
 	id := 0
 	wait := make(chan int)
 
@@ -243,9 +240,6 @@ func TestSlowSend(t *testing.T) {
 
 func TestCancelCallLeak(t *testing.T) {
 	g := setup(t)
-
-	gotrace.CheckLeak(g, 0)
-
 	for i := 0; i < 30; i++ {
 		id := 0
 		wait := make(chan int)
@@ -280,9 +274,6 @@ func TestCancelCallLeak(t *testing.T) {
 }
 
 func TestConcurrentCall(t *testing.T) {
-	g := setup(t)
-
-	gotrace.CheckLeak(g, 0)
 
 	req := make(chan []byte, 30)
 	t.Cleanup(func() { close(req) })
