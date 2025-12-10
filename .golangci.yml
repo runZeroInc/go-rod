@@ -1,61 +1,87 @@
-linters:
-  enable-all: true
-  disable:
-    - gochecknoinits
-    - paralleltest
-    - wrapcheck
-    - gosec
-    - gochecknoglobals
-    - musttag
-    - varnamelen
-    - wsl
-    - nonamedreturns
-    - tagliatelle
-    - nlreturn
-    - nakedret
-    - gomnd
-    - mnd
-    - err113
-    - exhaustruct
-    - godox
-    - depguard
-    - testpackage
-    - exhaustive
-    - containedctx
-    - prealloc
-    - perfsprint
-    - ireturn
-    - contextcheck
-    - canonicalheader
-    - copyloopvar
-    - intrange
-
-    # Deprecated ones:
-    - execinquery
-    - structcheck
-    - interfacer
-    - deadcode
-    - varcheck
-    - ifshort
-    - exhaustivestruct
-    - golint
-    - maligned
-    - nosnakecase
-    - scopelint
-
 linters-settings:
-  cyclop:
-    max-complexity: 15
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
   gocyclo:
     min-complexity: 15
-  nestif:
-    min-complexity: 6
-  funlen:
-    lines: 120
+  mnd:
+    # don't include the "operation" and "assign"
+    # checks: argument,case,condition,return
+  gosec:
+    severity: medium
+    excludes:
+      - G115
+  govet:
+    enable:
+      - shadow
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  gci:
+    custom-order: true                   # enable sections-based sorting
+    sections:
+      - standard                         # stdlib
+      - default                          # other
+      - prefix(github.com/runZeroInc)    # us, case sensitive
+    skip-generated: true
+  lll:
+    line-length: 250
+  misspell:
+    locale: US
+  nolintlint:
+    allow-unused: false # report any unused nolint directives
+    require-explanation: false # don't require an explanation for nolint directives
+    require-specific: false # don't require nolint directives to be specific about which linter is being skipped
+
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: true
+      - name: unused-receiver
+        disabled: true
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - gosec
+    - govet
+    - bodyclose
+    - typecheck
+    - unconvert
+    - goprintffuncname
+    - govet
+    - ineffassign
+    - noctx
+    - asciicheck
+    - rowserrcheck
+    - revive
+
+    # Deliberately not enabled:
+    # - gci # is a more configurable import sorter than gofumpt
+    # - nakedret # Disabled for now
+    # - prealloc # Disabled for now
+    # - nolintlint # Disabled for now
+    # - unused # Crashes on netip package
+    # - gofmt # Crashes on mapcidr/cidr.go
+    # - goimports # Crashes on tcp_checkmk.go timestamp strings
+    # - gosimple # Crashes on netip package
+    # - staticcheck # Triggers OOM and takes forever to run
 
 issues:
+  include:
+    - EXC0008
   exclude-use-default: false
-
   exclude-rules:
     - path: _test.go$
       linters:
@@ -108,3 +134,10 @@ issues:
     - path: lib/assets/
       linters:
         - lll
+
+
+    # govet's shadow check can be useful, but redeclaring err and ctx is common. Annoying to work around linter.
+    - text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
+      linters: [ govet ]
+
+  exclude:

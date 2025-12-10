@@ -20,7 +20,7 @@ func (l *Launcher) osSetupCmd(cmd *exec.Cmd) {
 		command = append(command, flags...)
 		command = append(command, cmd.Args...)
 
-		*cmd = *exec.Command("xvfb-run", command...)
+		*cmd = *exec.Command("xvfb-run", command...) //nolint:gosec
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }

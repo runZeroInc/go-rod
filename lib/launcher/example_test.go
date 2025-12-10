@@ -35,7 +35,7 @@ func Example_custom_launch() {
 	}
 	args := l.FormatArgs()
 
-	cmd := exec.Command(path, args...)
+	cmd := exec.Command(path, args...) //nolint:gosec
 	parser := launcher.NewURLParser()
 	cmd.Stderr = parser
 	utils.E(cmd.Start())

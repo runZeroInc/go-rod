@@ -47,6 +47,8 @@ type Launcher struct {
 // It will auto download the browser binary according to the current platform,
 // check [Launcher.Bin] and [Launcher.Revision] for more info.
 func New(opts ...BrowserOption) (*Launcher, error) {
+
+	// TODO: Find a cleaner way to pass options through (maybe flags?)
 	tmpB := &Browser{}
 	for _, opt := range opts {
 		opt(tmpB)
@@ -74,27 +76,48 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		// TODO: about the "site-per-process" see https://github.com/puppeteer/puppeteer/issues/2548
 		"disable-features": {"site-per-process", "TranslateUI"},
 
-		"disable-dev-shm-usage":                              nil,
+		"allow-chrome-scheme-url":                            nil, // Allow chrome:// URLs in headless mode
+		"allow-pre-commit-input":                             nil,
+		"bwsi":                                               nil,
 		"disable-background-networking":                      nil,
 		"disable-background-timer-throttling":                nil,
 		"disable-backgrounding-occluded-windows":             nil,
-		"disable-breakpad":                                   nil,
+		"disable-breakpad":                                   nil, // prevent crash dumps: https://github.com/runZeroInc/platform/issues/19900
 		"disable-client-side-phishing-detection":             nil,
 		"disable-component-extensions-with-background-pages": nil,
+		"disable-component-update":                           nil,
+		"disable-crash-reporter":                             nil,
 		"disable-default-apps":                               nil,
+		"disable-dev-shm-usage":                              nil, // Workaround for limited VM environments
 		"disable-gpu":                                        nil,
 		"disable-hang-monitor":                               nil,
+		"disable-infobars":                                   nil,
 		"disable-ipc-flooding-protection":                    nil,
+		"disable-notifications":                              nil,
+		"disable-plugins":                                    nil,
 		"disable-popup-blocking":                             nil,
 		"disable-prompt-on-repost":                           nil,
 		"disable-renderer-backgrounding":                     nil,
-		"disable-sync":                                       nil,
+		"disable-search-engine-choice-screen":                nil,
 		"disable-site-isolation-trials":                      nil,
+		"disable-sync":                                       nil,
+		"disable-translate":                                  nil,
 		"enable-automation":                                  nil,
 		"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
+		"enable-logging":                                     {"stderr"},
+		"export-tagged-pdf":                                  nil,
 		"force-color-profile":                                {"srgb"},
+		"generate-pdf-document-outline":                      nil,
+		"hide-scrollbars":                                    nil,
+		"ignore-certificate-errors":                          nil,
 		"metrics-recording-only":                             nil,
-		"use-mock-keychain":                                  nil,
+		"mute-audio":                                         nil,
+		"no-crashpad":                                        nil,
+		"no-default-browser-check":                           nil,
+		"password-store":                                     {"basic"},
+		"safebrowsing-disable-auto-update":                   nil,
+		"use-mock-keychain":                                  nil, // Avoid macOS keychain prompts
+		"log-level":                                          {"1"},
 	}
 
 	if defaults.Show {
@@ -109,11 +132,13 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 	if defaults.Proxy != "" {
 		defaultFlags[flags.ProxyServer] = []string{defaults.Proxy}
 	}
-
 	if tmpB.WindowWidth != 0 && tmpB.WindowHeight != 0 {
 		defaultFlags[flags.WindowSize] = []string{
 			fmt.Sprintf("%d,%d", tmpB.WindowWidth, tmpB.WindowHeight),
 		}
+	}
+	if tmpB.UserAgent != "" {
+		defaultFlags["user-agent"] = []string{tmpB.UserAgent}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -151,7 +176,13 @@ func NewMust(opts ...BrowserOption) *Launcher {
 // completely close the running browser. Unfortunately, there's no API for rod to tell it automatically yet.
 func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	bin, _ := LookPath()
+
+	// Prefer the system browser when user mode is requested
+	bin, found := LookPath()
+	if !found {
+		cancel()
+		panic("system browser not found")
+	}
 
 	b, err := NewBrowser(opts...)
 	if err != nil {
@@ -481,7 +512,7 @@ func (l *Launcher) Launch() (string, error) {
 	if err == nil {
 		return u, nil
 	}
-	cmd = exec.Command(bin, args...)
+	cmd = exec.Command(bin, args...) //nolint:gosec
 
 	l.setupCmd(cmd)
 	l.Env(getCleanChromeEnv(runtime.GOOS, l.Get(flags.UserDataDir))...)
