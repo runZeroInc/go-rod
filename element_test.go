@@ -287,7 +287,7 @@ func TestIframeCrossDomains(t *testing.T) {
 		<iframe sandbox src="`+u1+`"></iframe>
 	</html>`)
 
-	u := launcher.NewMust().HeadlessNew(true).NoSandbox(true).MustLaunch()
+	u := launcher.NewMust().Headless(true).NoSandbox(true).MustLaunch()
 	browser := rod.New().ControlURL(u).NoDefaultDevice().MustConnect()
 	defer browser.MustClose()
 

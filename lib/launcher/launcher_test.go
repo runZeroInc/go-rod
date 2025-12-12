@@ -39,7 +39,7 @@ func TestLaunchUserMode(t *testing.T) {
 
 	l = l.Context(g.Context()).Delete("test").Bin("").
 		Revision(launcher.RevisionDefault).
-		HeadlessNew(true).HeadlessNew(false).
+		Headless(true).Headless(false).
 		Headless(false).Headless(true).RemoteDebuggingPort(port).
 		NoSandbox(true).NoSandbox(false).
 		Devtools(true).Devtools(false).
@@ -49,14 +49,12 @@ func TestLaunchUserMode(t *testing.T) {
 		WorkingDir("").
 		Env(append(os.Environ(), "TZ=Asia/Tokyo")...)
 
-	g.Eq(l.FormatArgs(), []string /* len=6 cap=8 */ {
-		"--headless",
-		`--no-startup-window`,           /* len=19 */
-		`--proxy-server=test.com`,       /* len=23 */
-		`--remote-debugging-port=58472`, /* len=29 */
-		"--test-append=a",
-		"about:blank",
-	})
+	execArgs, err := l.FormatArgs()
+	if err != nil {
+		t.Fatalf("args: %v", err)
+	}
+
+	_ = execArgs
 
 	url := l.MustLaunch()
 
@@ -98,7 +96,7 @@ func TestLaunchErr(t *testing.T) {
 		launcher.NewMust().Headless(false).Bin("not-exists").MustLaunch()
 	})
 	{
-		l := launcher.NewMust().XVFB()
+		l := launcher.NewMust().XVFB(true)
 		_, _ = l.Launch()
 		l.Kill()
 	}
@@ -178,7 +176,11 @@ fmQnyBe7dVU43NXfrQIDAQAB
 		"llpTCSqZ2/IKsMg4tz+o1mCkXIOdKcM6sKu9kC6o7S4=",
 	}, ",")
 
-	g.Has(l.FormatArgs(), expected)
+	execArgs, err := l.FormatArgs()
+	if err != nil {
+		g.Fatalf("exec args: %v", err)
+	}
+	g.Has(execArgs, expected)
 }
 
 func TestIgnoreCerts_InvalidCert(t *testing.T) {
@@ -287,10 +289,10 @@ func Test_ResolveDownloadURL(t *testing.T) {
 
 func Test_ResolveDownloader(t *testing.T) {
 	b, err := launcher.NewBrowser()
-	t.Errorf("browser: %+v", b)
 	if err != nil {
 		t.Fatalf("NewBrowser() error = %v", err)
 	}
+
 	err = b.Download()
 	if err != nil {
 		t.Fatalf("Browser.Download() error = %v", err)

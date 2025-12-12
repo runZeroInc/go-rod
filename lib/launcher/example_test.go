@@ -33,7 +33,10 @@ func Example_custom_launch() {
 	if err != nil {
 		panic(err)
 	}
-	args := l.FormatArgs()
+	args, err := l.FormatArgs()
+	if err != nil {
+		panic(err)
+	}
 
 	cmd := exec.Command(path, args...) //nolint:gosec
 	parser := launcher.NewURLParser()

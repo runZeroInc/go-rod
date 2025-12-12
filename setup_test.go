@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +22,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 var TimeoutEach = flag.Duration("timeout-each", time.Minute, "timeout for each test")
@@ -30,15 +30,13 @@ var TimeoutEach = flag.Duration("timeout-each", time.Minute, "timeout for each t
 var LogDir = slash(fmt.Sprintf("tmp/cdp-log/%s", time.Now().Format("2006-01-02_15-04-05")))
 
 func init() {
-	/*
-		got.DefaultFlags("timeout=5m", "run=/")
+	got.DefaultFlags("timeout=5m", "run=/")
 
-		utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
+	utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
 
-		b, err := launcher.NewBrowser()
-		utils.E(err)
-		b.MustGet()
-	*/
+	b, err := launcher.NewBrowser()
+	utils.E(err)
+	b.MustGet()
 }
 
 var testerPool rod.Pool[G]
@@ -174,7 +172,7 @@ type MockClient struct {
 	sync.RWMutex
 	id        string
 	t         got.Testable
-	log       *log.Logger
+	log       *logrus.Logger
 	principal *cdp.Client
 	call      Call
 	event     <-chan *cdp.Event
@@ -188,7 +186,8 @@ func newMockClient(u string) *MockClient {
 	// create init log file
 	utils.E(os.MkdirAll(filepath.Join(LogDir, id), 0o755))
 	f, err := os.Create(filepath.Join(LogDir, id, "_.log"))
-	log := log.New(f, "", log.Ltime)
+	log := logrus.New()
+	log.Out = f
 	utils.E(err)
 
 	client := cdp.New().Logger(utils.MultiLogger(defaults.CDP, log)).Start(cdp.MustConnectWS(u))

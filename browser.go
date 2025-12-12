@@ -55,6 +55,8 @@ type Browser struct {
 
 	controlURL  string
 	client      CDPClient
+	launcher    *launcher.Launcher
+	browser     *launcher.Browser
 	event       *goob.Observable // all the browser events from cdp client
 	targetsLock *sync.Mutex
 
@@ -71,7 +73,7 @@ type Browser struct {
 // user-agent and can make the actual view area smaller than the browser window on headful mode,
 // you can use [Browser.NoDefaultDevice] to disable it.
 func New(opts ...launcher.BrowserOption) *Browser {
-	return (&Browser{
+	return &Browser{
 		ctx:           context.Background(),
 		sleeper:       DefaultSleeper,
 		controlURL:    defaults.URL,
@@ -79,11 +81,11 @@ func New(opts ...launcher.BrowserOption) *Browser {
 		trace:         defaults.Trace,
 		monitor:       defaults.Monitor,
 		logger:        DefaultLogger,
-		defaultDevice: devices.LaptopWithMDPIScreen.Landscape(),
-		targetsLock:   &sync.Mutex{},
 		states:        &sync.Map{},
+		targetsLock:   &sync.Mutex{},
+		defaultDevice: devices.LaptopWithMDPIScreen.Landscape(),
 		launchOptions: opts,
-	}).WithPanic(utils.Panic)
+	}
 }
 
 // Incognito creates a new incognito browser.
@@ -159,6 +161,7 @@ func (b *Browser) Connect() error {
 			if err != nil {
 				return err
 			}
+			b.launcher = l
 			u, err = l.Context(b.ctx).Launch()
 			if err != nil {
 				return err
@@ -183,6 +186,11 @@ func (b *Browser) Connect() error {
 	return proto.TargetSetDiscoverTargets{Discover: true}.Call(b)
 }
 
+// GetLauncher returns the underlying launcher.Browser instance
+func (b *Browser) GetLauncher() *launcher.Launcher {
+	return b.launcher
+}
+
 // Close the browser.
 func (b *Browser) Close() error {
 	if b.BrowserContextID == "" {
@@ -191,8 +199,13 @@ func (b *Browser) Close() error {
 	return proto.TargetDisposeBrowserContext{BrowserContextID: b.BrowserContextID}.Call(b)
 }
 
-// Page creates a new browser tab. If opts.URL is empty, the default target will be "about:blank".
+// Page creates a new browser tab with the default context. If opts.URL is empty, the default target will be "about:blank".
 func (b *Browser) Page(opts proto.TargetCreateTarget) (p *Page, err error) {
+	return b.PageWithContext(b.ctx, opts)
+}
+
+// Page creates a new browser tab with a specific context. If opts.URL is empty, the default target will be "about:blank".
+func (b *Browser) PageWithContext(ctx context.Context, opts proto.TargetCreateTarget) (p *Page, err error) {
 	req := opts
 	req.BrowserContextID = b.BrowserContextID
 	req.URL = "about:blank"
@@ -208,10 +221,11 @@ func (b *Browser) Page(opts proto.TargetCreateTarget) (p *Page, err error) {
 		}
 	}()
 
-	p, err = b.PageFromTarget(target.TargetID)
+	p, err = b.PageFromTargetWithContext(ctx, target.TargetID)
 	if err != nil {
 		return
 	}
+	p.ctx = ctx
 
 	if opts.URL == "" {
 		return
@@ -252,7 +266,8 @@ func (b *Browser) Call(ctx context.Context, sessionID, methodName string, params
 		return nil, err
 	}
 
-	b.set(proto.TargetSessionID(sessionID), methodName, params)
+	sid := proto.TargetSessionID(sessionID)
+	b.set(sid, methodName, params)
 	return
 }
 
@@ -271,6 +286,11 @@ func (b *Browser) PageFromSession(sessionID proto.TargetSessionID) *Page {
 
 // PageFromTarget gets or creates a Page instance.
 func (b *Browser) PageFromTarget(targetID proto.TargetTargetID) (*Page, error) {
+	return b.PageFromTargetWithContext(b.ctx, targetID)
+}
+
+// PageFromTargetWithContext gets or creates a Page instance with a context.
+func (b *Browser) PageFromTargetWithContext(ctx context.Context, targetID proto.TargetTargetID) (*Page, error) {
 	b.targetsLock.Lock()
 	defer b.targetsLock.Unlock()
 
@@ -287,7 +307,7 @@ func (b *Browser) PageFromTarget(targetID proto.TargetTargetID) (*Page, error) {
 		return nil, err
 	}
 
-	sessionCtx, cancel := context.WithCancel(b.ctx)
+	sessionCtx, cancel := context.WithCancel(ctx)
 
 	page = &Page{
 		e:             b.e,
