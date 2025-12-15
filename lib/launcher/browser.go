@@ -253,6 +253,10 @@ type Browser struct {
 	WithExecFlags       map[string]string
 	WithoutExecFlags    []string
 	WithEnv             map[string]string
+	UID                 int
+	GID                 int
+	NoSandbox           bool
+	HideWindow          bool
 
 	workingDir             string
 	downloadURL            string
@@ -426,6 +430,30 @@ func WithEnv(f map[string]string) BrowserOption {
 func WithXVFB(v bool) BrowserOption {
 	return func(b *Browser) {
 		b.xvfbEnabled = v
+	}
+}
+
+func WithUID(id int) BrowserOption {
+	return func(b *Browser) {
+		b.UID = id
+	}
+}
+
+func WithGID(id int) BrowserOption {
+	return func(b *Browser) {
+		b.GID = id
+	}
+}
+
+func WithNoSandbox(v bool) BrowserOption {
+	return func(b *Browser) {
+		b.NoSandbox = v
+	}
+}
+
+func WithHideWindow(v bool) BrowserOption {
+	return func(b *Browser) {
+		b.HideWindow = v
 	}
 }
 
@@ -771,6 +799,7 @@ func (b *Browser) Validate() (string, string, error) {
 		}
 		b.Logger.Debugf("invalid browser at %s: %v", p, err)
 	}
+	b.Logger.Debugf("no valid browsers found")
 	return "", "", fmt.Errorf("no valid browser found")
 }
 
@@ -930,7 +959,13 @@ func (b *Browser) validateAtPath(path string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
+	// Ensure that the non-privileged user can access the profile directory and the binary
+	if err := ensureUserPermissions(b.UID, b.GID, tmpProfile, path); err != nil {
+		b.Logger.Debugf("failed to ensure user permissions for %s with profile %s: %v", path, tmpProfile, err)
+	}
+
 	cmd := exec.CommandContext(ctx, path, "--version", "--user-data-dir="+tmpProfile) //nolint:gosec
+	cmd.SysProcAttr = getSysProcAttr(b.UID, b.GID)
 	cmd.Stdin = nil
 	cmd.Stderr = stderrBuff
 	cmd.Stdout = stdoutBuff

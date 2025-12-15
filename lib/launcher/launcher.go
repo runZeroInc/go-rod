@@ -4,6 +4,7 @@ package launcher
 import (
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -255,7 +256,7 @@ func GetExecFlags(conf *Browser) map[flags.Flag][]string {
 	if defaults.Devtools {
 		execFlags["auto-open-devtools-for-tabs"] = nil
 	}
-	if inContainer {
+	if inContainer || conf.NoSandbox || (runtime.GOOS == "linux" && os.Geteuid() == 0 && conf.UID == 0) {
 		execFlags[flags.NoSandbox] = nil
 	}
 	if defaults.Proxy != "" {
@@ -552,8 +553,6 @@ func (l *Launcher) Launch() (string, error) {
 		return "", ErrAlreadyLaunched
 	}
 
-	defer l.ctxCancel()
-
 	bin := l.browser.GetChromeBinary()
 	if bin == "" {
 		return "", fmt.Errorf("chrome path not resolved: %v", l.browser)
@@ -573,9 +572,13 @@ func (l *Launcher) Launch() (string, error) {
 	if err == nil {
 		return u, nil
 	}
-	cmd = exec.Command(bin, args...) //nolint:gosec
 
-	l.setupCmd(cmd)
+	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
+	l.setupCmd(l.ctx, cmd, l.browser.UID, l.browser.GID)
+
+	if err := ensureUserPermissions(l.browser.UID, l.browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
+		l.logger.Errorf("failed to ensure user permissions: %v", err)
+	}
 
 	err = cmd.Start()
 	if err != nil {
@@ -586,12 +589,15 @@ func (l *Launcher) Launch() (string, error) {
 
 	go func() {
 		_ = cmd.Wait()
+		l.ctxCancel()
 		close(l.exit)
+		killLeftoverProcesses(l.pid, bin)
 	}()
 
 	u, err = l.getURL()
 	if err != nil {
-		l.Kill()
+		killLeftoverProcesses(l.pid, bin)
+		l.ctxCancel()
 		return "", err
 	}
 
@@ -626,9 +632,8 @@ func (l *Launcher) setupUserPreferences() {
 	}
 }
 
-func (l *Launcher) setupCmd(cmd *exec.Cmd) {
-	l.osSetupCmd(cmd)
-
+func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
+	l.osSetupCmd(ctx, cmd, uid, gid)
 	cmd.Dir = l.browser.workingDir
 
 	// Apply user environment settings on top of a clean starting environment
@@ -682,11 +687,14 @@ func (l *Launcher) Kill() {
 	if err == nil {
 		_ = p.Kill()
 	}
+	killLeftoverProcesses(l.PID(), l.GetBin())
 }
 
 // Cleanup wait until the Browser exits and remove [flags.UserDataDir].
 func (l *Launcher) Cleanup() {
+	l.ctxCancel()
 	<-l.exit
+	l.Kill()
 	dir := l.Get(flags.UserDataDir)
 	_ = os.RemoveAll(dir)
 }
@@ -737,4 +745,85 @@ func getCleanChromeEnv(srcOS string, profileDir string) []string {
 		r = append(r, k+"="+v)
 	}
 	return r
+}
+
+func ensureUserPermissions(uid, gid int, userDir, binPath string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	if os.Geteuid() != 0 {
+		return nil
+	}
+	if uid == 0 {
+		return nil
+	}
+	var res error
+
+	if err := ensureUserPermissionsUserDir(uid, gid, userDir); err != nil {
+		res = errors.Join(res, fmt.Errorf("user dir permissions: %w", err))
+	}
+	if err := ensureUserPermissionsBinary(uid, gid, binPath); err != nil {
+		res = errors.Join(res, fmt.Errorf("binary permissions: %w", err))
+	}
+	return res
+}
+
+func ensureUserPermissionsUserDir(uid, gid int, userDir string) error {
+	// Validate user dir
+	if userDir == "" {
+		return fmt.Errorf("no user-data-dir")
+	}
+	st, err := os.Stat(userDir)
+	if err != nil {
+		return fmt.Errorf("userdir %s: %w", userDir, err)
+	}
+	if !st.IsDir() {
+		return fmt.Errorf("userdir %s is not a directory", userDir)
+	}
+
+	err = filepath.Walk(userDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == userDir {
+			// Ensure that the user directory is owned by the user
+			if err := os.Chown(path, uid, gid); err != nil {
+				return fmt.Errorf("chown path %s: %w", path, err)
+			}
+			return nil
+		}
+		// Try to ensure all leading paths are 755
+		_ = os.Chmod(path, 0o755) //nolint:gosec
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("userdir path %s: %w", userDir, err)
+	}
+	return nil
+}
+
+func ensureUserPermissionsBinary(uid, gid int, binPath string) error {
+	// Validate bin path
+	if binPath == "" {
+		return fmt.Errorf("no binary path")
+	}
+	st, err := os.Stat(binPath)
+	if err != nil {
+		return fmt.Errorf("bin path %s: %w", binPath, err)
+	}
+	if st.IsDir() {
+		return fmt.Errorf("bin path %s is a directory", binPath)
+	}
+
+	err = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		_ = os.Chmod(path, 0o755) //nolint:gosec
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("bin path %s: %w", binPath, err)
+	}
+	return nil
 }
