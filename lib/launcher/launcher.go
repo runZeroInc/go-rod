@@ -126,11 +126,36 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 	}
 
 	ctx, cancel := context.WithCancel(srcContext)
-	browser, err := NewBrowser(opts...)
-	if err != nil {
+	earlyCleanup := func() {
 		cancel()
 		_ = os.RemoveAll(profileDir)
+	}
+
+	browser, err := NewBrowser(opts...)
+	if err != nil {
+
 		return nil, err
+	}
+
+	if browser.GetChromeBinary() == "" {
+		// Bail early if automatic installation is disabled
+		if !browser.UseAutomaticInstall {
+			cancel()
+			return nil, fmt.Errorf("%s", "chrome binary not found")
+		}
+		// Download a fresh binary if needed
+		if err = browser.Download(); err != nil {
+			earlyCleanup()
+			return nil, fmt.Errorf("automatic install failed: %w", err)
+		}
+		// Validate that the binary is usable
+		cpath, vstr, err := browser.Validate()
+		if err != nil {
+			earlyCleanup()
+			return nil, fmt.Errorf("failed to validate new install: %w", err)
+		}
+		browser.chromeBinary = cpath
+		browser.chromeVersion = vstr
 	}
 
 	l := &Launcher{

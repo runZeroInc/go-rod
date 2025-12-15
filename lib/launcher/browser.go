@@ -435,13 +435,10 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 		UseAutomaticInstall: true,
 		UseSystemChrome:     true,
 		Context:             context.Background(),
-		HTTPClient: &http.Client{
-			Timeout: 15 * time.Minute,
-		},
-		WithExecFlags: map[string]string{},
-		WithEnv:       map[string]string{},
-		TempDir:       "",
-		workingDir:    ".",
+		WithExecFlags:       map[string]string{},
+		WithEnv:             map[string]string{},
+		TempDir:             "",
+		workingDir:          ".",
 	}
 
 	// Apply options
