@@ -33,6 +33,9 @@ import (
 	Note that systems using MUSL instead of GLIBC (like Alpine Linux) require OS packages as well.
 */
 
+// TODO: Consider using chromedriver instead of calling chrome directly:
+// - https://github.com/VibiumDev/vibium/blob/main/clicker/internal/browser/installer.go
+
 // ChromeForTestingLatestDownloadsURL is the URL to fetch the latest Chromium-for-Testing metadata.
 const ChromeForTestingLatestDownloadsURL = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
 
@@ -678,16 +681,10 @@ func (b *Browser) Download() error {
 	}
 
 	for _, f := range zr.File {
-		// Clean the file name of dodgy sequences and trim at depth 1
-		dname, err := cleanZipFileName(f.Name, 1)
+
+		fpath, err := cleanZipFileName(b.DownloadDir(), f.Name, 1)
 		if err != nil {
 			b.Logger.Debugf("skipping extracting of %s: %v", f.Name, err)
-			continue
-		}
-
-		fpath, err := filepath.Abs(filepath.Join(b.DownloadDir(), dname))
-		if err != nil {
-			b.Logger.Debugf("failed to get absolute path for %q: %v", dname, err)
 			continue
 		}
 
@@ -1063,23 +1060,9 @@ func Open(url string) {
 	}
 }
 
-func expandWindowsExePaths(list ...string) []string {
-	newList := []string{}
-	for _, p := range list {
-		newList = append(
-			newList,
-			filepath.Join(os.Getenv("ProgramFiles"), p),
-			filepath.Join(os.Getenv("ProgramFiles(x86)"), p),
-			filepath.Join(os.Getenv("LocalAppData"), p),
-		)
-	}
-
-	return newList
-}
-
-// cleanZipFileName cleans the zip file name trimming traversal sequences and removing
+// cleanZipFileName cleans the zip file name by trimming traversal sequences and removing
 // the specified number of leading path segments.
-func cleanZipFileName(fname string, depth int) (string, error) {
+func cleanZipFileName(baseDir string, fname string, depth int) (string, error) {
 	fname = strings.ReplaceAll(fname, "\\", "/")
 	bits := []string{}
 	for _, b := range strings.Split(fname, "/") {
@@ -1091,7 +1074,15 @@ func cleanZipFileName(fname string, depth int) (string, error) {
 	if len(bits) <= depth {
 		return "", fmt.Errorf("unexpected file name in zip: %s", fname)
 	}
-	return filepath.Join(bits[depth:]...), nil
+
+	relPath := filepath.Join(bits[depth:]...)
+	absPath := filepath.Join(baseDir, relPath)
+
+	// Ensure the resulting path is within the base directory
+	if !strings.HasPrefix(absPath, filepath.Clean(baseDir)+string(os.PathSeparator)) {
+		return "", fmt.Errorf("zip slip detected: %s", absPath)
+	}
+	return absPath, nil
 }
 
 // LimitedDiscardingBuffer is an io.Writer that stores up to maxLen bytes and discards any additional

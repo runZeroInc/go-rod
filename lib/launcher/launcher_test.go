@@ -36,6 +36,7 @@ func TestLaunchUserMode(t *testing.T) {
 
 	dir := l.Get(flags.UserDataDir)
 	port := 58472
+	bin := l.GetBin()
 
 	l = l.Context(g.Context()).Delete("test").Bin("").
 		Revision(launcher.RevisionDefault).
@@ -47,7 +48,8 @@ func TestLaunchUserMode(t *testing.T) {
 		Proxy("test.com").
 		UserDataDir("test").UserDataDir(dir).
 		WorkingDir("").
-		Env(append(os.Environ(), "TZ=Asia/Tokyo")...)
+		Env(append(os.Environ(), "TZ=Asia/Tokyo")...).
+		Bin(bin)
 
 	execArgs, err := l.FormatArgs()
 	if err != nil {

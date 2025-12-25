@@ -104,7 +104,9 @@ type Launcher struct {
 
 // New returns a launcher instance with the configured options.
 func New(opts ...BrowserOption) (*Launcher, error) {
-	conf := &Browser{}
+	conf := &Browser{
+		Logger: logrus.StandardLogger(),
+	}
 	for _, opt := range opts {
 		opt(conf)
 	}
