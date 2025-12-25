@@ -67,10 +67,10 @@ func TestHelper(t *testing.T) {
 	{
 		s := ut.Serve()
 		s.Route("/", ".txt")
-		s.Route("/file", "go.mod")
+		s.Route("/file", "utils_test.go")
 		s.Route("/a", ".html", "ok")
 		s.Route("/b", ".json", "ok", 1)
-		f, err := os.Open("go.mod")
+		f, err := os.Open("utils_test.go")
 		ut.E(err)
 		s.Route("/c", ".html", f)
 		s.Mux.HandleFunc("/d", func(_ http.ResponseWriter, r *http.Request) {

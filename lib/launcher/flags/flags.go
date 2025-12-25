@@ -12,6 +12,9 @@ const (
 	// UserDataDir https://chromium.googlesource.com/chromium/src/+/master/docs/user_data_dir.md
 	UserDataDir Flag = "user-data-dir"
 
+	// Preferences flag.
+	Preferences Flag = "rod-preferences"
+
 	// Headless mode. Whether to run browser in headless mode. A mode without visible UI.
 	Headless Flag = "headless"
 
@@ -33,29 +36,8 @@ const (
 	// WindowPosition flag.
 	WindowPosition Flag = "window-position"
 
-	// WorkingDir flag.
-	WorkingDir Flag = "rod-working-dir"
-
-	// Env flag.
-	Env Flag = "rod-env"
-
-	// XVFB flag.
-	XVFB Flag = "rod-xvfb"
-
 	// ProfileDir flag.
 	ProfileDir = "profile-directory"
-
-	// Preferences flag.
-	Preferences Flag = "rod-preferences"
-
-	// Leakless flag.
-	Leakless Flag = "rod-leakless"
-
-	// Bin is the browser executable file path. If it's empty, launcher will automatically search or download the bin.
-	Bin Flag = "rod-bin"
-
-	// KeepUserDataDir flag.
-	KeepUserDataDir Flag = "rod-keep-user-data-dir"
 
 	// Arguments for the command. Such as
 	//     chrome-bin http://a.com http://b.com
@@ -73,4 +55,9 @@ func (f Flag) Check() {
 // NormalizeFlag normalize the flag name, remove the leading dash.
 func (f Flag) NormalizeFlag() Flag {
 	return Flag(strings.TrimLeft(string(f), "-"))
+}
+
+// String casts back to a string
+func (f Flag) String() string {
+	return string(f)
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -464,7 +465,7 @@ func TestOldBrowser(t *testing.T) {
 	t.Skip()
 
 	g := setup(t)
-	u := launcher.New().Revision(686378).MustLaunch()
+	u := launcher.NewMust().Revision(686378).MustLaunch()
 	b := rod.New().ControlURL(u).MustConnect()
 	g.Cleanup(b.MustClose)
 	res, err := proto.BrowserGetVersion{}.Call(b)
@@ -475,7 +476,7 @@ func TestOldBrowser(t *testing.T) {
 func TestBrowserLostConnection(t *testing.T) {
 	g := setup(t)
 
-	l := launcher.New()
+	l := launcher.NewMust()
 	p := rod.New().ControlURL(l.MustLaunch()).MustConnect().MustPage(g.blank())
 
 	go func() {
@@ -492,4 +493,112 @@ func TestBrowserConnectConflict(t *testing.T) {
 	g.Panic(func() {
 		rod.New().Client(&cdp.Client{}).ControlURL("test").MustConnect()
 	})
+}
+
+func TestGetDefaultSystemChromeExecutables(t *testing.T) {
+	tests := []struct {
+		goos     string
+		expected []string
+	}{
+		{
+			goos: "windows",
+			expected: []string{
+				"chrome.exe", "chromium.exe", "msedge.exe",
+			},
+		},
+		{
+			goos: "darwin",
+			expected: []string{
+				"Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+				"Google Chrome.app/Contents/MacOS/Google Chrome",
+				"Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta",
+				"Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+				"Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
+				"Chromium.app/Contents/MacOS/Chromium",
+				"Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+				"chrome", "chromium", "microsoft-edge",
+			},
+		},
+		{
+			goos: "linux",
+			expected: []string{
+				"chrome", "google-chrome", "google-chrome-beta", "google-chrome-canary", "google-chrome-unstable",
+				"chromium", "chromium-browser", "microsoft-edge",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		got := launcher.GetDefaultSystemChromeExecutables(tt.goos)
+		for _, want := range tt.expected {
+			found := false
+			for _, g := range got {
+				if g == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("GOOS=%s: expected executable %q in list, got %v", tt.goos, want, got)
+			}
+		}
+	}
+}
+
+func TestGetDefaultSystemChromeDirs(t *testing.T) {
+	tests := []struct {
+		goos     string
+		expected []string
+	}{
+		{
+			goos:     "darwin",
+			expected: []string{"/Applications", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"},
+		},
+		{
+			goos: "linux",
+			expected: []string{
+				"/opt/google/chrome", "/opt/google/chrome-beta", "/opt/google/chrome-canary", "/opt/google/chrome-unstable",
+				"/usr/bin", "/usr/local/bin",
+				"/data/data/com.termux/files/usr/bin",
+				"/opt/microsoft/msedge",
+			},
+		},
+		{
+			goos: "windows",
+			expected: []string{
+				`C:\Program Files (x86)\Google\Chrome\Application`,
+				`C:\Program Files\Microsoft\Edge\Application`,
+				`C:\Users\TestUser\AppData\Local\Microsoft\Edge\Application`,
+			},
+		},
+	}
+
+	t.Setenv("LocalAppData", `C:\Users\TestUser\AppData\Local`)
+	t.Setenv("ProgramFiles", `C:\Program Files`)
+	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
+	for _, tt := range tests {
+		got := launcher.GetDefaultSystemChromeDirs(tt.goos)
+		for _, want := range tt.expected {
+			found := false
+			for _, g := range got {
+				if strings.Contains(g, want) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("OS=%s: expected dir containing %q in list, got %v", tt.goos, want, got)
+			}
+		}
+	}
+}
+
+func TestResolveChromePaths(t *testing.T) {
+	b := &launcher.Browser{
+		UseChromePath: "/custom/path/to/chrome",
+	}
+	paths := b.ResolveChromePaths("darwin")
+	if len(paths) != 1 || paths[0] != "/custom/path/to/chrome" {
+		t.Errorf("expected only custom path, got %v", paths)
+	}
 }

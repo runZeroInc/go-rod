@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	l := launcher.New()
+	l := launcher.NewMust()
 
 	// For more info: https://pkg.go.dev/github.com/runZeroInc/go-rod/lib/launcher
 	u := l.MustLaunch()

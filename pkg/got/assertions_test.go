@@ -53,7 +53,7 @@ func TestAssertion(t *testing.T) {
 
 	as.Nil(nil)
 	as.Nil((*int)(nil))
-	as.Nil(os.Stat("go.mod"))
+	as.Nil(os.Stat("assertions_test.go"))
 	as.NotNil([]int{})
 
 	as.Zero("")

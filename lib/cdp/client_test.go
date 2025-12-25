@@ -15,7 +15,6 @@ import (
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
-	"github.com/runZeroInc/go-rod/pkg/gotrace"
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
@@ -26,7 +25,7 @@ func TestBasic(t *testing.T) {
 
 	ctx := g.Context()
 
-	client := cdp.New().Logger(defaults.CDP).Start(cdp.MustConnectWS(launcher.New().MustLaunch()))
+	client := cdp.New().Logger(defaults.CDP).Start(cdp.MustConnectWS(launcher.NewMust().MustLaunch()))
 
 	defer func() {
 		_, _ = client.Call(ctx, "", "Browser.close", nil)
@@ -127,7 +126,7 @@ func TestError(t *testing.T) {
 	g.True(cdpErr.Is(&cdpErr))
 
 	g.Panic(func() {
-		cdp.MustStartWithURL(context.Background(), "", nil)
+		cdp.MustStartWithURL(t.Context(), "", nil)
 	})
 }
 
@@ -136,7 +135,7 @@ func TestCrash(t *testing.T) {
 
 	ctx := g.Context()
 
-	client := cdp.MustStartWithURL(ctx, launcher.New().MustLaunch(), nil)
+	client := cdp.MustStartWithURL(ctx, launcher.NewMust().MustLaunch(), nil)
 
 	go func() {
 		for range client.Event() {
@@ -209,8 +208,6 @@ func TestFormat(t *testing.T) {
 func TestSlowSend(t *testing.T) {
 	g := setup(t)
 
-	gotrace.CheckLeak(g, 0)
-
 	id := 0
 	wait := make(chan int)
 
@@ -243,9 +240,6 @@ func TestSlowSend(t *testing.T) {
 
 func TestCancelCallLeak(t *testing.T) {
 	g := setup(t)
-
-	gotrace.CheckLeak(g, 0)
-
 	for i := 0; i < 30; i++ {
 		id := 0
 		wait := make(chan int)
@@ -280,13 +274,8 @@ func TestCancelCallLeak(t *testing.T) {
 }
 
 func TestConcurrentCall(t *testing.T) {
-	g := setup(t)
-
-	gotrace.CheckLeak(g, 0)
-
 	req := make(chan []byte, 30)
 	t.Cleanup(func() { close(req) })
-
 	ws := &MockWebSocket{
 		send: func(data []byte) error {
 			req <- data

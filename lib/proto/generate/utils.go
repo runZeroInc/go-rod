@@ -13,8 +13,17 @@ import (
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
-func getSchema() gson.JSON {
-	l := launcher.New().Bin(launcher.NewBrowser().MustGet())
+func getSchema() (gson.JSON, error) {
+	b, err := launcher.NewBrowser()
+	if err != nil {
+		return gson.JSON{}, err
+	}
+
+	l, err := launcher.New()
+	if err != nil {
+		return gson.JSON{}, err
+	}
+	l.Bin(b.MustGet())
 	defer l.Kill()
 
 	u := l.MustLaunch()
@@ -34,7 +43,7 @@ func getSchema() gson.JSON {
 
 	utils.E(utils.OutputFile("tmp/proto.json", obj.JSON("", "  ")))
 
-	return obj
+	return obj, nil
 }
 
 func mapType(n string) string {

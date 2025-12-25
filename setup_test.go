@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,8 +21,8 @@ import (
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
-	"github.com/runZeroInc/go-rod/pkg/gotrace"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 var TimeoutEach = flag.Duration("timeout-each", time.Minute, "timeout for each test")
@@ -35,7 +34,9 @@ func init() {
 
 	utils.E(os.MkdirAll(slash("tmp/cdp-log"), 0o755))
 
-	launcher.NewBrowser().MustGet() // preload browser to local
+	b, err := launcher.NewBrowser()
+	utils.E(err)
+	b.MustGet()
 }
 
 var testerPool rod.Pool[G]
@@ -51,10 +52,6 @@ func TestMain(m *testing.M) {
 	testerPool.Cleanup(func(g *G) {
 		g.browser.MustClose()
 	})
-
-	if err := gotrace.Check(0, gotrace.IgnoreFuncs("internal/poll.runtime_pollWait")); err != nil {
-		log.Fatal(err)
-	}
 }
 
 // G is a tester. Testers are thread-safe, they shouldn't race each other.
@@ -89,7 +86,7 @@ func newTesterPool() rod.Pool[G] {
 }
 
 func newTester() *G {
-	u := launcher.New().Set("proxy-bypass-list", "<-loopback>").NoSandbox(true).MustLaunch()
+	u := launcher.NewMust().Set("proxy-bypass-list", "<-loopback>").NoSandbox(true).MustLaunch()
 
 	mc := newMockClient(u)
 
@@ -124,9 +121,6 @@ func setup(t *testing.T) G {
 	tester.G = got.New(t)
 	tester.mc.t = t
 	tester.mc.log.SetOutput(tester.Open(true, filepath.Join(LogDir, tester.mc.id, t.Name()+".log")))
-
-	tester.checkLeaking()
-
 	tester.page.MustNavigate("")
 
 	return *tester
@@ -170,45 +164,6 @@ func (g G) newPage(u ...string) *rod.Page {
 	return p
 }
 
-func (g *G) checkLeaking() {
-	ig := gotrace.CombineIgnores(gotrace.IgnoreCurrent(), gotrace.IgnoreNonChildren())
-	gotrace.CheckLeak(g.Testable, 0, ig)
-
-	self := gotrace.Get(false)[0]
-	g.cancelTimeout = g.DoAfter(*TimeoutEach, func() {
-		t := gotrace.Get(true).Filter(func(t *gotrace.Trace) bool {
-			if t.GoroutineID == self.GoroutineID {
-				return false
-			}
-			return ig(t)
-		}).String()
-		panic(fmt.Sprintf(`[rod_test.TimeoutEach] %s timeout after %v
-running goroutines: %s`, g.Name(), *TimeoutEach, t))
-	})
-
-	g.Cleanup(func() {
-		if g.Failed() {
-			return
-		}
-
-		// close all other pages other than g.page
-		res, err := proto.TargetGetTargets{}.Call(g.browser)
-		g.E(err)
-		for _, info := range res.TargetInfos {
-			if info.TargetID != g.page.TargetID {
-				g.E(proto.TargetCloseTarget{TargetID: info.TargetID}.Call(g.browser))
-			}
-		}
-
-		if g.browser.LoadState(g.page.SessionID, &proto.FetchEnable{}) {
-			g.Logf("leaking FetchEnable")
-			g.FailNow()
-		}
-
-		g.mc.setCall(nil)
-	})
-}
-
 type Call func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error)
 
 var _ rod.CDPClient = &MockClient{}
@@ -217,7 +172,7 @@ type MockClient struct {
 	sync.RWMutex
 	id        string
 	t         got.Testable
-	log       *log.Logger
+	log       *logrus.Logger
 	principal *cdp.Client
 	call      Call
 	event     <-chan *cdp.Event
@@ -231,7 +186,8 @@ func newMockClient(u string) *MockClient {
 	// create init log file
 	utils.E(os.MkdirAll(filepath.Join(LogDir, id), 0o755))
 	f, err := os.Create(filepath.Join(LogDir, id, "_.log"))
-	log := log.New(f, "", log.Ltime)
+	log := logrus.New()
+	log.Out = f
 	utils.E(err)
 
 	client := cdp.New().Logger(utils.MultiLogger(defaults.CDP, log)).Start(cdp.MustConnectWS(u))

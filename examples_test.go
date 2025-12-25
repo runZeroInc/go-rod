@@ -68,7 +68,7 @@ func Example_basic() {
 func Example_disable_headless_to_debug() {
 	// Headless runs the browser on foreground, you can also use flag "-rod=show"
 	// Devtools opens the tab in each new tab opened automatically
-	l := launcher.New().
+	l := launcher.NewMust().
 		Headless(false).
 		Devtools(true)
 
@@ -387,7 +387,7 @@ func Example_customize_retry_strategy() {
 // Usually you use launcher lib to set the browser's command line flags (switches).
 // Doc for flags: https://peter.sh/experiments/chromium-command-line-switches
 func Example_customize_browser_launch() {
-	url := launcher.New().
+	url := launcher.NewMust().
 		Proxy("127.0.0.1:8080").     // set flag "--proxy-server=127.0.0.1:8080"
 		Delete("use-mock-keychain"). // delete flag "--use-mock-keychain"
 		MustLaunch()
@@ -656,7 +656,7 @@ func ExampleBrowser_pool() {
 func Example_load_extension() {
 	extPath, _ := filepath.Abs("fixtures/chrome-extension")
 
-	u := launcher.New().
+	u := launcher.NewMust().
 		// Must use abs path for an extension
 		Set("load-extension", extPath).
 		// Headless mode doesn't support extension yet.
@@ -684,7 +684,7 @@ func Example_log_cdp_traffic() {
 				fmt.Printf("id: %d", v.ID)
 			}
 		})).
-		Start(cdp.MustConnectWS(launcher.New().MustLaunch()))
+		Start(cdp.MustConnectWS(launcher.NewMust().MustLaunch()))
 
 	rod.New().Client(cdp).MustConnect().MustPage("http://mdn.dev")
 }

@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -20,6 +18,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/cdp"
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // CDPClient is usually used to make rod side-effect free. Such as proxy all IO of rod.
@@ -64,7 +63,7 @@ func (msg *Message) Load(e proto.Event) bool {
 }
 
 // DefaultLogger for rod.
-var DefaultLogger = log.New(os.Stdout, "[rod] ", log.LstdFlags)
+var DefaultLogger = logrus.New()
 
 // DefaultSleeper generates the default sleeper for retry, it uses backoff to grow the interval.
 // The growth looks like:

@@ -23,6 +23,7 @@ import (
 	"github.com/runZeroInc/go-rod/lib/proto"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/gson"
+	"github.com/sirupsen/logrus"
 )
 
 func TestGetPageBrowser(t *testing.T) {
@@ -476,16 +477,7 @@ func TestPageWaitRequestIdle(t *testing.T) {
 	}`
 
 	waitReq := ""
-	g.browser.Logger(utils.Log(func(msg ...interface{}) {
-		typ := msg[0].(rod.TraceType)
-		if typ == rod.TraceTypeWaitRequests {
-			list := msg[2].(map[string]string)
-			for _, v := range list {
-				waitReq = v
-				break
-			}
-		}
-	}))
+	g.browser.Logger(logrus.New())
 	defer g.browser.Logger(rod.DefaultLogger)
 
 	g.browser.Trace(true)

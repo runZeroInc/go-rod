@@ -1,6 +1,0 @@
-github.com/runZeroInc/go-rod/pkg/fetchup v0.2.1 h1:n/NgIx92KOXFiKAhK3d+LlKpl8JuSjh5U27ULmHKtag=
-github.com/runZeroInc/go-rod/pkg/fetchup v0.2.1/go.mod h1:94ROLWpn5fmCD4LPlcZ+LOE/iE/kRTU3kL+0ue/V+Os=
-github.com/runZeroInc/go-rod/pkg/gop v0.3.0 h1:b/t6tbGSIaSqfnhb1R6Xkye4ZkINfKiUxYZF33JEZWU=
-github.com/runZeroInc/go-rod/pkg/gop v0.3.0/go.mod h1:K4LAB/BdLArknXrVSy+DyXcfb8P85JwAtwYM8zlb0mU=
-github.com/runZeroInc/go-rod/pkg/got v0.33.2 h1:mz0PaCMzR//YBtDDkDf6z0O09SfotXBHzw3zLrrS2sw=
-github.com/runZeroInc/go-rod/pkg/got v0.33.2/go.mod h1:P3C/Wwttv4uq/tpovaH+c8ANmHePyFPxEbNzdxcEGDU=

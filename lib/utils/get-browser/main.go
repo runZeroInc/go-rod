@@ -9,7 +9,10 @@ import (
 )
 
 func main() {
-	p, err := launcher.NewBrowser().Get()
+	b, err := launcher.NewBrowser()
+	utils.E(err)
+
+	p, err := b.Get()
 	utils.E(err)
 
 	fmt.Println(p)

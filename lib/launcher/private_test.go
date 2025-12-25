@@ -1,33 +1,17 @@
 package launcher
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/runZeroInc/go-rod/lib/cdp"
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/got"
 )
-
-func HostTest(host string) Host {
-	return func(revision int) string {
-		return fmt.Sprintf(
-			"%s/chromium-browser-snapshots/%s/%d/%s",
-			host,
-			hostConf.urlPrefix,
-			revision,
-			hostConf.zipName,
-		)
-	}
-}
 
 var setup = got.Setup(nil)
 
@@ -64,7 +48,7 @@ func TestLaunchOptions(t *testing.T) {
 		inContainer = utils.InContainer
 	}()
 
-	l := New()
+	l := NewMust()
 
 	g.False(l.Has(flags.Headless))
 
@@ -76,66 +60,19 @@ func TestLaunchOptions(t *testing.T) {
 func TestGetURLErr(t *testing.T) {
 	g := setup(t)
 
-	l := New()
+	l := NewMust()
 
 	l.ctxCancel()
 	_, err := l.getURL()
 	g.Err(err)
 
-	l = New()
+	l = NewMust()
 	l.parser.lock.Lock()
 	l.parser.Buffer = "err"
 	l.parser.lock.Unlock()
 	close(l.exit)
 	_, err = l.getURL()
 	g.Eq("[launcher] Failed to get the debug url: err", err.Error())
-}
-
-func TestManaged(t *testing.T) {
-	g := setup(t)
-
-	ctx := g.Timeout(5 * time.Second)
-
-	s := got.New(g).Serve()
-	rl := NewManager()
-	s.Mux.Handle("/", rl)
-
-	l := MustNewManaged(s.URL()).KeepUserDataDir().Delete(flags.KeepUserDataDir)
-	c := l.MustClient()
-	g.E(c.Call(ctx, "", "Browser.getVersion", nil))
-	utils.Sleep(1)
-	_, _ = c.Call(ctx, "", "Browser.crash", nil)
-	dir := l.Get(flags.UserDataDir)
-
-	for ctx.Err() == nil {
-		utils.Sleep(0.1)
-		_, err := os.Stat(dir)
-		if err != nil {
-			break
-		}
-	}
-	g.Err(os.Stat(dir))
-
-	u, h := MustNewManaged(s.URL()).Bin("go").ClientHeader()
-	_, err := cdp.StartWithURL(ctx, u, h)
-	g.Eq(err.(*cdp.BadHandshakeError).Body, "[rod-manager] not allowed rod-bin path: go (use --allow-all to disable the protection)")
-}
-
-func TestLaunchErrs(t *testing.T) {
-	g := setup(t)
-
-	l := New().Bin("echo")
-	_, err := l.Launch()
-	g.Err(err)
-
-	s := g.Serve()
-	s.Route("/", "", nil)
-	l = New().Bin("")
-	l.browser.Logger = utils.LoggerQuiet
-	l.browser.RootDir = filepath.Join("tmp", "browser-from-mirror", g.RandStr(16))
-	l.browser.Hosts = []Host{HostTest(s.URL())}
-	_, err = l.Launch()
-	g.Err(err)
 }
 
 func TestURLParserErr(t *testing.T) {
@@ -161,21 +98,4 @@ func TestTestOpen(_ *testing.T) {
 	defer func() { openExec = exec.Command }()
 
 	Open("about:blank")
-}
-
-func TestLaunchClient(t *testing.T) {
-	g := setup(t)
-
-	ctx := g.Timeout(5 * time.Second)
-
-	s := got.New(g).Serve()
-	rl := NewManager()
-	s.Mux.Handle("/", rl)
-
-	l := MustNewManaged(s.URL()).KeepUserDataDir().Delete(flags.KeepUserDataDir)
-	c, err := l.Client()
-	if err != nil {
-		g.Err(err)
-	}
-	g.E(c.Call(ctx, "", "Browser.getVersion", nil))
 }

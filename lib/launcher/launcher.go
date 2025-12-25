@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -17,11 +18,72 @@ import (
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/leakless"
+	"github.com/sirupsen/logrus"
 )
 
 // DefaultUserDataDirPrefix ...
-var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "rod", "user-data")
+var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "go-rod-user-data")
+
+var DefaultExecFlags = map[string][]string{
+	// use random port by default (0)
+	"remote-debugging-port": {defaults.Port},
+
+	// enable headless by default
+	"headless": nil,
+
+	// to disable the init blank window
+	"no-first-run":      nil,
+	"no-startup-window": nil,
+
+	"disable-features": {
+		"site-per-process", // See https://github.com/puppeteer/puppeteer/issues/2548
+		"TranslateUI",
+		"OptimizationGuideModelDownloading", "OptimizationHintsFetching", "OptimizationTargetPrediction", "OptimizationHints",
+	},
+
+	"allow-chrome-scheme-url":                            nil, // Allow chrome:// URLs in headless mode
+	"allow-pre-commit-input":                             nil,
+	"bwsi":                                               nil,
+	"disable-background-networking":                      nil,
+	"disable-background-timer-throttling":                nil,
+	"disable-backgrounding-occluded-windows":             nil,
+	"disable-breakpad":                                   nil, // prevent crash dumps: https://github.com/runZeroInc/platform/issues/19900
+	"disable-client-side-phishing-detection":             nil,
+	"disable-component-extensions-with-background-pages": nil,
+	"disable-component-update":                           nil,
+	"disable-crash-reporter":                             nil,
+	"disable-default-apps":                               nil,
+	"disable-dev-shm-usage":                              nil, // Workaround for limited VM environments
+	"disable-gpu":                                        nil,
+	"disable-hang-monitor":                               nil,
+	"disable-infobars":                                   nil,
+	"disable-ipc-flooding-protection":                    nil,
+	"disable-notifications":                              nil,
+	"disable-plugins":                                    nil,
+	"disable-popup-blocking":                             nil,
+	"disable-prompt-on-repost":                           nil,
+	"disable-renderer-backgrounding":                     nil,
+	"disable-search-engine-choice-screen":                nil,
+	"disable-site-isolation-trials":                      nil,
+	"disable-sync":                                       nil,
+	"disable-translate":                                  nil,
+	"enable-automation":                                  nil,
+	"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
+	"enable-logging":                                     {"stderr"},
+	"export-tagged-pdf":                                  nil,
+	"force-color-profile":                                {"srgb"},
+	"generate-pdf-document-outline":                      nil,
+	"hide-scrollbars":                                    nil,
+	"ignore-certificate-errors":                          nil,
+	"metrics-recording-only":                             nil,
+	"mute-audio":                                         nil,
+	"no-crashpad":                                        nil,
+	"no-default-browser-check":                           nil,
+	"password-store":                                     {"basic"},
+	"safebrowsing-disable-auto-update":                   nil,
+	"use-mock-keychain":                                  nil, // Avoid macOS keychain prompts
+	"log-level":                                          {"1"},
+}
 
 // Launcher is a helper to launch browser binary smartly.
 type Launcher struct {
@@ -30,129 +92,196 @@ type Launcher struct {
 	ctx       context.Context
 	ctxCancel func()
 
-	logger io.Writer
+	logger *logrus.Logger
 
 	browser *Browser
 	parser  *URLParser
 	pid     int
 	exit    chan struct{}
 
-	managed    bool
-	serviceURL string
-
 	isLaunched int32 // zero means not launched
 }
 
-// New returns the default arguments to start browser.
-// Headless will be enabled by default.
-// Leakless will be enabled by default.
-// UserDataDir will use OS tmp dir by default, this folder will usually be cleaned up by the OS after reboot.
-// It will auto download the browser binary according to the current platform,
-// check [Launcher.Bin] and [Launcher.Revision] for more info.
-func New() *Launcher {
-	dir := defaults.Dir
-	if dir == "" {
-		dir = filepath.Join(DefaultUserDataDirPrefix, utils.RandString(8))
+// New returns a launcher instance with the configured options.
+func New(opts ...BrowserOption) (*Launcher, error) {
+	conf := &Browser{
+		Logger: logrus.StandardLogger(),
+	}
+	for _, opt := range opts {
+		opt(conf)
 	}
 
-	defaultFlags := map[flags.Flag][]string{
-		flags.Bin:      {defaults.Bin},
-		flags.Leakless: nil,
-
-		flags.UserDataDir: {dir},
-
-		// use random port by default
-		flags.RemoteDebuggingPort: {defaults.Port},
-
-		// enable headless by default
-		flags.Headless: nil,
-
-		// to disable the init blank window
-		"no-first-run":      nil,
-		"no-startup-window": nil,
-
-		// TODO: about the "site-per-process" see https://github.com/puppeteer/puppeteer/issues/2548
-		"disable-features": {"site-per-process", "TranslateUI"},
-
-		"disable-dev-shm-usage":                              nil,
-		"disable-background-networking":                      nil,
-		"disable-background-timer-throttling":                nil,
-		"disable-backgrounding-occluded-windows":             nil,
-		"disable-breakpad":                                   nil,
-		"disable-client-side-phishing-detection":             nil,
-		"disable-component-extensions-with-background-pages": nil,
-		"disable-default-apps":                               nil,
-		"disable-hang-monitor":                               nil,
-		"disable-ipc-flooding-protection":                    nil,
-		"disable-popup-blocking":                             nil,
-		"disable-prompt-on-repost":                           nil,
-		"disable-renderer-backgrounding":                     nil,
-		"disable-sync":                                       nil,
-		"disable-site-isolation-trials":                      nil,
-		"enable-automation":                                  nil,
-		"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
-		"force-color-profile":                                {"srgb"},
-		"metrics-recording-only":                             nil,
-		"use-mock-keychain":                                  nil,
+	profileDir, err := os.MkdirTemp(conf.TempDir, "go-rod-launcher-*")
+	if err != nil {
+		return nil, fmt.Errorf("mktemp user data dir %s: %w", profileDir, err)
 	}
 
-	if defaults.Show {
-		delete(defaultFlags, flags.Headless)
-	}
-	if defaults.Devtools {
-		defaultFlags["auto-open-devtools-for-tabs"] = nil
-	}
-	if inContainer {
-		defaultFlags[flags.NoSandbox] = nil
-	}
-	if defaults.Proxy != "" {
-		defaultFlags[flags.ProxyServer] = []string{defaults.Proxy}
+	execFlags := GetExecFlags(conf)
+	execFlags[flags.UserDataDir] = []string{profileDir}
+
+	// Configure the top-level context
+	var srcContext context.Context
+	if conf.Context != nil {
+		srcContext = conf.Context
+	} else {
+		srcContext = context.Background()
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	return &Launcher{
+	ctx, cancel := context.WithCancel(srcContext)
+	earlyCleanup := func() {
+		cancel()
+		_ = os.RemoveAll(profileDir)
+	}
+
+	browser, err := NewBrowser(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if browser.GetChromeBinary() == "" {
+		// Bail early if automatic installation is disabled
+		if !browser.UseAutomaticInstall {
+			cancel()
+			return nil, fmt.Errorf("%s", "chrome binary not found")
+		}
+		// Download a fresh binary if needed
+		if err = browser.Download(); err != nil {
+			earlyCleanup()
+			return nil, fmt.Errorf("automatic install failed: %w", err)
+		}
+		// Validate that the binary is usable
+		cpath, vstr, err := browser.Validate()
+		if err != nil {
+			earlyCleanup()
+			return nil, fmt.Errorf("failed to validate new install: %w", err)
+		}
+		browser.chromeBinary = cpath
+		browser.chromeVersion = vstr
+	}
+
+	l := &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
-		Flags:     defaultFlags,
+		Flags:     execFlags,
 		exit:      make(chan struct{}),
-		browser:   NewBrowser(),
+		browser:   browser,
 		parser:    NewURLParser(),
-		logger:    io.Discard,
+		logger:    conf.Logger,
 	}
+	l = l.WindowSize(conf.WindowWidth, conf.WindowHeight)
+
+	return l, nil
+}
+
+func NewMust(opts ...BrowserOption) *Launcher {
+	l, err := New(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return l
 }
 
 // NewUserMode is a preset to enable reusing current user data. Useful for automation of personal browser.
 // If you see any error, it may because you can't launch debug port for existing browser, the solution is to
 // completely close the running browser. Unfortunately, there's no API for rod to tell it automatically yet.
-func NewUserMode() *Launcher {
+func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	bin, _ := LookPath()
 
+	opts = append(opts,
+		WithExecFlags(map[string]string{
+			"remote-debugging-port": "37112",
+			"no-startup-window":     "",
+		}),
+		WithoutExecFlags([]string{
+			"headless",
+		}),
+	)
+
+	b, err := NewBrowser(opts...)
+	if err != nil {
+		cancel()
+		panic(err)
+	}
 	return &Launcher{
 		ctx:       ctx,
 		ctxCancel: cancel,
-		Flags: map[flags.Flag][]string{
-			flags.RemoteDebuggingPort: {"37712"},
-			"no-startup-window":       nil,
-			flags.Bin:                 {bin},
-		},
-		browser: NewBrowser(),
-		exit:    make(chan struct{}),
-		parser:  NewURLParser(),
-		logger:  io.Discard,
+		Flags:     GetExecFlags(b),
+		browser:   b,
+		exit:      make(chan struct{}),
+		parser:    NewURLParser(),
+		logger:    b.Logger,
+	}, nil
+}
+
+func NewUserModeMust() *Launcher {
+	l, err := New()
+	if err != nil {
+		panic(err)
 	}
+	return l
 }
 
 // NewAppMode is a preset to run the browser like a native application.
 // The u should be a URL.
-func NewAppMode(u string) *Launcher {
-	l := New()
+func NewAppMode(u string) (*Launcher, error) {
+	l, err := New()
+	if err != nil {
+		return nil, err
+	}
+	l.browser.SetEnv("GOOGLE_API_KEY", "no")
 	l.Set(flags.App, u).
-		Set(flags.Env, "GOOGLE_API_KEY=no").
 		Headless(false).
 		Delete("no-startup-window").
 		Delete("enable-automation")
+	return l, nil
+}
+
+func NewAppModeMust(u string) *Launcher {
+	l, err := NewAppMode(u)
+	if err != nil {
+		panic(err)
+	}
 	return l
+}
+
+func GetExecFlags(conf *Browser) map[flags.Flag][]string {
+	// Configure the execution flags for this launch
+	execFlags := make(map[flags.Flag][]string, len(DefaultExecFlags))
+	for fk, fv := range DefaultExecFlags {
+		execFlags[flags.Flag(fk)] = fv
+	}
+	if defaults.Show {
+		delete(execFlags, flags.Headless)
+	}
+	if defaults.Devtools {
+		execFlags["auto-open-devtools-for-tabs"] = nil
+	}
+	if inContainer || conf.NoSandbox || (runtime.GOOS == "linux" && os.Geteuid() == 0 && conf.UID == 0) {
+		execFlags[flags.NoSandbox] = nil
+	}
+	if defaults.Proxy != "" {
+		execFlags[flags.ProxyServer] = []string{defaults.Proxy}
+	}
+
+	if conf.WindowWidth != 0 && conf.WindowHeight != 0 {
+		execFlags[flags.WindowSize] = []string{
+			fmt.Sprintf("%d,%d", conf.WindowWidth, conf.WindowHeight),
+		}
+	}
+	if conf.UserAgent != "" {
+		execFlags["user-agent"] = []string{conf.UserAgent}
+	}
+
+	// Clear any flags specified by the user
+	for _, k := range conf.WithoutExecFlags {
+		delete(execFlags, flags.Flag(k))
+	}
+
+	// Overwrite any flags specified by the user
+	for k, v := range conf.WithExecFlags {
+		execFlags[flags.Flag(k)] = []string{v}
+	}
+	return execFlags
 }
 
 // Context sets the context.
@@ -210,29 +339,17 @@ func (l *Launcher) Delete(name flags.Flag) *Launcher {
 	return l
 }
 
-// Bin of the browser binary path to launch, if the path is not empty the auto download will be disabled.
-func (l *Launcher) Bin(path string) *Launcher {
-	return l.Set(flags.Bin, path)
-}
-
 // Revision of the browser to auto download.
 func (l *Launcher) Revision(rev int) *Launcher {
-	l.browser.Revision = rev
+	l.browser.chromeDownloadRevision = rev
 	return l
 }
 
 // Headless switch. Whether to run browser in headless mode. A mode without visible UI.
+// Note that modern Chrome versions have deprecated the old headless mode and all --headless is new mode.
 func (l *Launcher) Headless(enable bool) *Launcher {
 	if enable {
 		return l.Set(flags.Headless)
-	}
-	return l.Delete(flags.Headless)
-}
-
-// HeadlessNew switch is the "--headless=new" switch: https://developer.chrome.com/docs/chromium/new-headless
-func (l *Launcher) HeadlessNew(enable bool) *Launcher {
-	if enable {
-		return l.Set(flags.Headless, "new")
 	}
 	return l.Delete(flags.Headless)
 }
@@ -250,8 +367,25 @@ func (l *Launcher) NoSandbox(enable bool) *Launcher {
 }
 
 // XVFB enables to run browser in by XVFB. Useful when you want to run headful mode on linux.
-func (l *Launcher) XVFB(args ...string) *Launcher {
-	return l.Set(flags.XVFB, args...)
+func (l *Launcher) XVFB(v bool) *Launcher {
+	l.browser.SetXVFB(v)
+	return l
+}
+
+// Bin overrides the chrome binary path.
+func (l *Launcher) Bin(cpath string) *Launcher {
+	l.browser.SetChromeBinary(cpath)
+	return l
+}
+
+// GetBin returns the chrome binary path.
+func (l *Launcher) GetBin() string {
+	return l.browser.chromeBinary
+}
+
+// GetBin returns the chrome binary path.
+func (l *Launcher) GetBinVersion() string {
+	return l.browser.chromeVersion
 }
 
 // Preferences set chromium user preferences, such as set the default search engine or disable the pdf viewer.
@@ -265,15 +399,6 @@ func (l *Launcher) Preferences(pref string) *Launcher {
 // It will set chromium user preferences to enable the always_open_pdf_externally option.
 func (l *Launcher) AlwaysOpenPDFExternally() *Launcher {
 	return l.Set(flags.Preferences, `{"plugins":{"always_open_pdf_externally": true}}`)
-}
-
-// Leakless switch. If enabled, the browser will be force killed after the Go process exits.
-// The doc of leakless: https://github.com/runZeroInc/go-rod/pkg/leakless.
-func (l *Launcher) Leakless(enable bool) *Launcher {
-	if enable {
-		return l.Set(flags.Leakless)
-	}
-	return l.Delete(flags.Leakless)
 }
 
 // Devtools switch to auto open devtools for each tab.
@@ -326,8 +451,8 @@ func (l *Launcher) ProfileDir(dir string) *Launcher {
 }
 
 // RemoteDebuggingPort to launch the browser. Zero for a random port. Zero is the default value.
-// If it's not zero and the Launcher.Leakless is disabled, the launcher will try to reconnect to it first,
-// if the reconnection fails it will launch a new browser.
+// If it's not zero, the launcher will try to reconnect to it first, if the reconnection fails
+// it will launch a new browser.
 func (l *Launcher) RemoteDebuggingPort(port int) *Launcher {
 	return l.Set(flags.RemoteDebuggingPort, fmt.Sprintf("%d", port))
 }
@@ -349,7 +474,8 @@ func (l *Launcher) WindowPosition(x, y int) *Launcher {
 
 // WorkingDir to launch the browser process.
 func (l *Launcher) WorkingDir(path string) *Launcher {
-	return l.Set(flags.WorkingDir, path)
+	l.browser.workingDir = path
+	return l
 }
 
 // Env to launch the browser process. The default value is [os.Environ]().
@@ -357,7 +483,14 @@ func (l *Launcher) WorkingDir(path string) *Launcher {
 //
 //	Env(append(os.Environ(), "TZ=Asia/Tokyo")...)
 func (l *Launcher) Env(env ...string) *Launcher {
-	return l.Set(flags.Env, env...)
+	for _, s := range env {
+		bits := strings.SplitN(s, "=", 2)
+		if len(bits) == 1 {
+			bits = append(bits, "")
+		}
+		l.browser.SetEnv(bits[0], bits[1])
+	}
+	return l
 }
 
 // StartURL to launch.
@@ -366,21 +499,19 @@ func (l *Launcher) StartURL(u string) *Launcher {
 }
 
 // FormatArgs returns the formatted arg list for cli.
-func (l *Launcher) FormatArgs() []string {
+func (l *Launcher) FormatArgs() ([]string, error) {
 	execArgs := []string{}
 	for k, v := range l.Flags {
 		if k == flags.Arguments {
 			continue
 		}
 
-		if strings.HasPrefix(string(k), "rod-") {
-			continue
-		}
-
 		// fix a bug of chrome, if path is not absolute chrome will hang
 		if k == flags.UserDataDir {
 			abs, err := filepath.Abs(v[0])
-			utils.E(err)
+			if err != nil {
+				return execArgs, fmt.Errorf("failed to resolve profile dir %s: %v", v[0], err)
+			}
 			v[0] = abs
 		}
 
@@ -393,15 +524,15 @@ func (l *Launcher) FormatArgs() []string {
 
 	execArgs = append(execArgs, l.Flags[flags.Arguments]...)
 	sort.Strings(execArgs)
-	return execArgs
+	return execArgs, nil
 }
 
 // Logger to handle stdout and stderr from browser.
 // For example, pipe all browser output to stdout:
 //
 //	launcher.New().Logger(os.Stdout)
-func (l *Launcher) Logger(w io.Writer) *Launcher {
-	l.logger = w
+func (l *Launcher) Logger(logger *logrus.Logger) *Launcher {
+	l.logger = logger
 	return l
 }
 
@@ -422,56 +553,51 @@ func (l *Launcher) Launch() (string, error) {
 		return "", ErrAlreadyLaunched
 	}
 
-	defer l.ctxCancel()
-
-	bin, err := l.getBin()
-	if err != nil {
-		return "", err
+	bin := l.browser.GetChromeBinary()
+	if bin == "" {
+		return "", fmt.Errorf("chrome path not resolved: %v", l.browser)
 	}
 
 	l.setupUserPreferences()
 
-	var ll *leakless.Launcher
 	var cmd *exec.Cmd
 
-	args := l.FormatArgs()
-
-	if l.Has(flags.Leakless) && leakless.Support() {
-		ll = leakless.New()
-		cmd = ll.Command(bin, args...)
-	} else {
-		port := l.Get(flags.RemoteDebuggingPort)
-		u, err := ResolveURL(port)
-		if err == nil {
-			return u, nil
-		}
-		cmd = exec.Command(bin, args...)
+	args, err := l.FormatArgs()
+	if err != nil {
+		return "", err
 	}
 
-	l.setupCmd(cmd)
+	port := l.Get(flags.RemoteDebuggingPort)
+	u, err := ResolveURL(port)
+	if err == nil {
+		return u, nil
+	}
+
+	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
+	l.setupCmd(l.ctx, cmd, l.browser.UID, l.browser.GID)
+
+	if err := ensureUserPermissions(l.browser.UID, l.browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
+		l.logger.Errorf("failed to ensure user permissions: %v", err)
+	}
 
 	err = cmd.Start()
 	if err != nil {
 		return "", err
 	}
 
-	if ll == nil {
-		l.pid = cmd.Process.Pid
-	} else {
-		l.pid = <-ll.Pid()
-		if ll.Err() != "" {
-			return "", errors.New(ll.Err())
-		}
-	}
+	l.pid = cmd.Process.Pid
 
 	go func() {
 		_ = cmd.Wait()
+		l.ctxCancel()
 		close(l.exit)
+		killLeftoverProcesses(l.pid, bin)
 	}()
 
-	u, err := l.getURL()
+	u, err = l.getURL()
 	if err != nil {
-		l.Kill()
+		killLeftoverProcesses(l.pid, bin)
+		l.ctxCancel()
 		return "", err
 	}
 
@@ -500,28 +626,34 @@ func (l *Launcher) setupUserPreferences() {
 
 	path := filepath.Join(userDir, profile, "Preferences")
 
-	utils.E(utils.OutputFile(path, pref))
-}
-
-func (l *Launcher) setupCmd(cmd *exec.Cmd) {
-	l.osSetupCmd(cmd)
-
-	dir := l.Get(flags.WorkingDir)
-	env, _ := l.GetFlags(flags.Env)
-	cmd.Dir = dir
-	cmd.Env = env
-
-	cmd.Stdout = io.MultiWriter(l.logger, l.parser)
-	cmd.Stderr = io.MultiWriter(l.logger, l.parser)
-}
-
-func (l *Launcher) getBin() (string, error) {
-	bin := l.Get(flags.Bin)
-	if bin == "" {
-		l.browser.Context = l.ctx
-		return l.browser.Get()
+	err = utils.OutputFile(path, pref)
+	if err != nil {
+		l.logger.Errorf("failed to write user preferences to %s: %v", path, err)
 	}
-	return bin, nil
+}
+
+func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
+	l.osSetupCmd(ctx, cmd, uid, gid)
+	cmd.Dir = l.browser.workingDir
+
+	// Apply user environment settings on top of a clean starting environment
+	cleanEnvMap := getCleanChromeEnvMap(runtime.GOOS, l.Get(flags.UserDataDir))
+	for _, estr := range l.browser.GetEnv() {
+		bits := strings.SplitN(estr, "=", 2)
+		if len(bits) == 1 {
+			bits = append(bits, "")
+		}
+		cleanEnvMap[bits[0]] = bits[1]
+	}
+
+	cleanEnvStr := make([]string, 0, len(cleanEnvMap))
+	for k, v := range cleanEnvMap {
+		cleanEnvStr = append(cleanEnvStr, k+"="+v)
+	}
+	cmd.Env = cleanEnvStr
+
+	cmd.Stdout = io.MultiWriter(l.logger.Writer(), l.parser)
+	cmd.Stderr = io.MultiWriter(l.logger.Writer(), l.parser)
 }
 
 func (l *Launcher) getURL() (u string, err error) {
@@ -542,8 +674,8 @@ func (l *Launcher) PID() int {
 
 // Kill the browser process.
 func (l *Launcher) Kill() {
-	// TODO: If kill too fast, the browser's children processes may not be ready.
-	// Browser don't have an API to tell if the children processes are ready.
+	// TODO: If we kill too fast, the browser's children processes may not be ready.
+	// Browser does not have an API to tell if the children processes are ready.
 	utils.Sleep(1)
 
 	if l.PID() == 0 { // avoid killing the current process
@@ -555,12 +687,143 @@ func (l *Launcher) Kill() {
 	if err == nil {
 		_ = p.Kill()
 	}
+	killLeftoverProcesses(l.PID(), l.GetBin())
 }
 
 // Cleanup wait until the Browser exits and remove [flags.UserDataDir].
 func (l *Launcher) Cleanup() {
+	l.ctxCancel()
 	<-l.exit
-
+	l.Kill()
 	dir := l.Get(flags.UserDataDir)
 	_ = os.RemoveAll(dir)
+}
+
+func getCleanChromeEnvMap(srcOS string, profileDir string) map[string]string {
+	r := map[string]string{}
+	for _, ent := range os.Environ() {
+		ekey, eval, _ := strings.Cut(ent, "=")
+		ekey = strings.ToUpper(ekey)
+		if ekey == "TMP" || ekey == "TEMP" || ekey == "TMPDIR" {
+			continue
+		}
+		// Skip XDG (home, config, cache, runtime) to avoid conflicts
+		if strings.HasPrefix(ekey, "XDG_") {
+			continue
+		}
+		// Skip DBUS to avoid autolaunch delays and errors
+		if strings.HasPrefix(ekey, "DBUS_") {
+			continue
+		}
+		// Skip CHROME_* environment variables that may be set system-wide
+		if strings.HasPrefix(ekey, "CHROME") {
+			// Disable existing environment overrides (CHROME_DEBUG_LOG, CHROME_CONFIG_HOME, etc)
+			continue
+		}
+		// Skip proxy environment variables to avoid conflicts
+		if ekey == "ALL_PROXY" || ekey == "HTTP_PROXY" || ekey == "HTTPS_PROXY" || ekey == "FTP_PROXY" || ekey == "AUTO_PROXY" || ekey == "SOCKS_SERVER" || ekey == "NO_PROXY" {
+			// Disable all proxy parameters
+			continue
+		}
+		r[ekey] = eval
+	}
+
+	// Chrome needs a writeable temporary and profile directory, especially when running as a less-privileged user
+	// Without these, Chrome will fail wth errors like:
+	// - chrome_crashpad_handler: --database is required - Try 'chrome_crashpad_handler --help' for more information.
+	tmpOverrides := []string{"TMP", "TEMP", "TMPDIR", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"}
+	for _, ekey := range tmpOverrides {
+		r[ekey] = profileDir
+	}
+	return r
+}
+
+func getCleanChromeEnv(srcOS string, profileDir string) []string {
+	m := getCleanChromeEnvMap(srcOS, profileDir)
+	r := make([]string, 0, len(m))
+	for k, v := range m {
+		r = append(r, k+"="+v)
+	}
+	return r
+}
+
+func ensureUserPermissions(uid, gid int, userDir, binPath string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	if os.Geteuid() != 0 {
+		return nil
+	}
+	if uid == 0 {
+		return nil
+	}
+	var res error
+
+	if err := ensureUserPermissionsUserDir(uid, gid, userDir); err != nil {
+		res = errors.Join(res, fmt.Errorf("user dir permissions: %w", err))
+	}
+	if err := ensureUserPermissionsBinary(uid, gid, binPath); err != nil {
+		res = errors.Join(res, fmt.Errorf("binary permissions: %w", err))
+	}
+	return res
+}
+
+func ensureUserPermissionsUserDir(uid, gid int, userDir string) error {
+	// Validate user dir
+	if userDir == "" {
+		return fmt.Errorf("no user-data-dir")
+	}
+	st, err := os.Stat(userDir)
+	if err != nil {
+		return fmt.Errorf("userdir %s: %w", userDir, err)
+	}
+	if !st.IsDir() {
+		return fmt.Errorf("userdir %s is not a directory", userDir)
+	}
+
+	err = filepath.Walk(userDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == userDir {
+			// Ensure that the user directory is owned by the user
+			if err := os.Chown(path, uid, gid); err != nil {
+				return fmt.Errorf("chown path %s: %w", path, err)
+			}
+			return nil
+		}
+		// Try to ensure all leading paths are 755
+		_ = os.Chmod(path, 0o755) //nolint:gosec
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("userdir path %s: %w", userDir, err)
+	}
+	return nil
+}
+
+func ensureUserPermissionsBinary(uid, gid int, binPath string) error {
+	// Validate bin path
+	if binPath == "" {
+		return fmt.Errorf("no binary path")
+	}
+	st, err := os.Stat(binPath)
+	if err != nil {
+		return fmt.Errorf("bin path %s: %w", binPath, err)
+	}
+	if st.IsDir() {
+		return fmt.Errorf("bin path %s is a directory", binPath)
+	}
+
+	err = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		_ = os.Chmod(path, 0o755) //nolint:gosec
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("bin path %s: %w", binPath, err)
+	}
+	return nil
 }

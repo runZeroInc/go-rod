@@ -1,42 +1,44 @@
 package launcher_test
 
 import (
-	"os"
 	"os/exec"
 
 	"github.com/runZeroInc/go-rod"
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/utils"
-	"github.com/runZeroInc/go-rod/pkg/leakless"
+	"github.com/sirupsen/logrus"
 )
 
 func Example_use_system_browser() {
 	if path, exists := launcher.LookPath(); exists {
-		u := launcher.New().Bin(path).MustLaunch()
+		u := launcher.NewMust().Bin(path).MustLaunch()
 		rod.New().ControlURL(u).MustConnect()
 	}
 }
 
 func Example_print_browser_CLI_output() {
 	// Pipe the browser stderr and stdout to os.Stdout .
-	u := launcher.New().Logger(os.Stdout).MustLaunch()
+	u := launcher.NewMust().Logger(logrus.New()).MustLaunch()
 	rod.New().ControlURL(u).MustConnect()
 }
 
 func Example_custom_launch() {
 	// get the browser executable path
-	path := launcher.NewBrowser().MustGet()
+	b, err := launcher.NewBrowser()
+	utils.E(err)
+	path := b.MustGet()
 
 	// use the FormatArgs to construct args, this line is optional, you can construct the args manually
-	args := launcher.New().FormatArgs()
-
-	var cmd *exec.Cmd
-	if true { // decide whether to use leakless or not
-		cmd = leakless.New().Command(path, args...)
-	} else {
-		cmd = exec.Command(path, args...)
+	l, err := launcher.New()
+	if err != nil {
+		panic(err)
+	}
+	args, err := l.FormatArgs()
+	if err != nil {
+		panic(err)
 	}
 
+	cmd := exec.Command(path, args...) //nolint:gosec
 	parser := launcher.NewURLParser()
 	cmd.Stderr = parser
 	utils.E(cmd.Start())

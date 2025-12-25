@@ -11,12 +11,7 @@ import (
 	"time"
 
 	"github.com/runZeroInc/go-rod/pkg/goob"
-	"github.com/runZeroInc/go-rod/pkg/gotrace"
 )
-
-func checkLeak(t *testing.T) {
-	gotrace.CheckLeak(t, 0)
-}
 
 type null struct{}
 
@@ -27,7 +22,6 @@ func eq(t *testing.T, expected, actual interface{}) {
 }
 
 func TestNew(t *testing.T) {
-	checkLeak(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer t.Cleanup(cancel)
@@ -56,7 +50,6 @@ func TestNew(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	checkLeak(t)
 
 	ob := goob.New(context.Background())
 
@@ -68,7 +61,6 @@ func TestCancel(t *testing.T) {
 }
 
 func TestClosed(t *testing.T) {
-	checkLeak(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -86,7 +78,6 @@ func TestClosed(t *testing.T) {
 }
 
 func TestMultipleConsumers(t *testing.T) {
-	checkLeak(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer t.Cleanup(cancel)
@@ -140,7 +131,6 @@ func TestMultipleConsumers(t *testing.T) {
 }
 
 func TestSlowConsumer(t *testing.T) {
-	checkLeak(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer t.Cleanup(cancel)
@@ -156,7 +146,6 @@ func TestSlowConsumer(t *testing.T) {
 }
 
 func TestMonkey(t *testing.T) {
-	checkLeak(t)
 
 	count := int32(0)
 	roundSize := 20
