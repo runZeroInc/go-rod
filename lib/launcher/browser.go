@@ -974,7 +974,7 @@ func (b *Browser) validateAtPath(path string) (string, error) {
 	}
 
 	verStr := strings.TrimSpace(stdoutBuff.String())
-	b.Logger.Debugf("chrome at %s has version %q", path, verStr)
+	b.Logger.Debugf("chrome at %s has version %q (uid:%d/gid:%d)", path, verStr, b.UID, b.GID)
 
 	if validChromeVersionPat.MatchString(verStr) {
 		return verStr, nil
