@@ -11,6 +11,6 @@ This is a fork of @ysmood's [https://github.com/go-rod/rod](https://github.com/g
 Thank you very much to @ysmood and all go-rod contributors.
 
 Your particular Go use case may be better handled by:
-- The original [https://github.com/go-rod/rod](https://github.com/go-rod/rod) package.
+- The original [go-rod/rod](https://github.com/go-rod/rod) package.
 - The new [Vibium Clicker](https://github.com/VibiumDev/vibium/tree/main/clicker) package.
 - The mature [chromedp](https://github.com/chromedp/chromedp) package.
