@@ -570,7 +570,6 @@ func (b *Browser) BinPath() string {
 
 // Download the browser to the local cache
 func (b *Browser) Download() error {
-
 	// Resolve the latest download URL if not already set
 	if b.chromeDownloadRevision == 0 || b.downloadURL == "" {
 		dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
@@ -985,7 +984,6 @@ func (b *Browser) validateAtPath(path string) (string, error) {
 	}
 
 	return verStr, fmt.Errorf("unknown version format: %q", verStr)
-
 }
 
 // getDefaultHomeDir returns the preferred home directory in an OS-specific way.
@@ -1037,46 +1035,8 @@ func GetDefaultBrowserCacheDirs(srcOS string) ([]string, error) {
 }
 
 // LookPath searches for the preferred browser binary across OS-specific paths.
-// TODO: Replace with our launcher library logic instead (cache dir, system paths, etc.)
 func LookPath() (found string, has bool) {
-	list := map[string][]string{
-		"darwin": {
-			"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-			"/Applications/Chromium.app/Contents/MacOS/Chromium",
-			"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-			"/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-			"/usr/bin/google-chrome-stable",
-			"/usr/bin/google-chrome",
-			"/usr/bin/chromium",
-			"/usr/bin/chromium-browser",
-		},
-		"linux": {
-			"chrome",
-			"google-chrome",
-			"/usr/bin/google-chrome",
-			"microsoft-edge",
-			"/usr/bin/microsoft-edge",
-			"chromium",
-			"chromium-browser",
-			"google-chrome-stable",
-			"/usr/bin/google-chrome-stable",
-			"/usr/bin/chromium",
-			"/usr/bin/chromium-browser",
-			"/snap/bin/chromium",
-			"/data/data/com.termux/files/usr/bin/chromium-browser",
-		},
-		"openbsd": {
-			"chrome",
-			"chromium",
-		},
-		"windows": append([]string{"chrome", "edge"}, expandWindowsExePaths(
-			`Google\Chrome\Application\chrome.exe`,
-			`Chromium\Application\chrome.exe`,
-			`Microsoft\Edge\Application\msedge.exe`,
-		)...),
-	}[runtime.GOOS]
-
-	for _, path := range list {
+	for _, path := range ResolveChromePathsFromSystem(runtime.GOOS) {
 		var err error
 		found, err = exec.LookPath(path)
 		has = err == nil
@@ -1084,7 +1044,6 @@ func LookPath() (found string, has bool) {
 			break
 		}
 	}
-
 	return
 }
 

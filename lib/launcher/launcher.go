@@ -104,7 +104,6 @@ type Launcher struct {
 
 // New returns a launcher instance with the configured options.
 func New(opts ...BrowserOption) (*Launcher, error) {
-
 	conf := &Browser{}
 	for _, opt := range opts {
 		opt(conf)
@@ -134,7 +133,6 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 
 	browser, err := NewBrowser(opts...)
 	if err != nil {
-
 		return nil, err
 	}
 
