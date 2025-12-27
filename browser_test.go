@@ -593,7 +593,7 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 	}
 }
 
-func TestResolveChromePaths(t *testing.T) {
+func TestResolveChromiumPaths(t *testing.T) {
 	b := &launcher.Browser{
 		UseChromiumPath: "/custom/path/to/chrome",
 	}
