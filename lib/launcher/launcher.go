@@ -104,13 +104,15 @@ type Launcher struct {
 
 // New returns a launcher instance with the configured options.
 func New(opts ...BrowserOption) (*Launcher, error) {
-	conf := &Browser{
-		Logger: logrus.StandardLogger(),
-	}
+	conf := &Browser{}
 	for _, opt := range opts {
 		opt(conf)
 	}
+	if conf.Logger == nil {
+		conf.Logger = logrus.StandardLogger()
+	}
 
+	// Create a temporary user data dir for this browser instance
 	profileDir, err := os.MkdirTemp(conf.TempDir, "go-rod-launcher-*")
 	if err != nil {
 		return nil, fmt.Errorf("mktemp user data dir %s: %w", profileDir, err)
@@ -135,28 +137,8 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 
 	browser, err := NewBrowser(opts...)
 	if err != nil {
+		earlyCleanup()
 		return nil, err
-	}
-
-	if browser.GetChromeBinary() == "" {
-		// Bail early if automatic installation is disabled
-		if !browser.UseAutomaticInstall {
-			cancel()
-			return nil, fmt.Errorf("%s", "chrome binary not found")
-		}
-		// Download a fresh binary if needed
-		if err = browser.Download(); err != nil {
-			earlyCleanup()
-			return nil, fmt.Errorf("automatic install failed: %w", err)
-		}
-		// Validate that the binary is usable
-		cpath, vstr, err := browser.Validate()
-		if err != nil {
-			earlyCleanup()
-			return nil, fmt.Errorf("failed to validate new install: %w", err)
-		}
-		browser.chromeBinary = cpath
-		browser.chromeVersion = vstr
 	}
 
 	l := &Launcher{

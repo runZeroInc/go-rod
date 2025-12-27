@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -522,11 +521,10 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	}
 
 	// Validate that the binary is usable
-	cpath, vstr, err := b.Validate()
+	cpath, err := b.ChooseChromePath()
 	if err == nil {
-		b.Logger.Debugf("validated existing browser at %s (%s)", cpath, vstr)
+		b.Logger.Debugf("using executable %s", cpath)
 		b.chromeBinary = cpath
-		b.chromeVersion = vstr
 		return b, nil
 	}
 
@@ -554,7 +552,18 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 
 	b.Logger.Debugf("chrome revision %d found at %s", b.chromeDownloadRevision, b.downloadURL)
 
-	return b, nil
+	if err := b.Download(); err != nil {
+		return nil, fmt.Errorf("automatic install failed: %w", err)
+	}
+
+	cpath, err = b.ChooseChromePath()
+	if err == nil {
+		b.Logger.Debugf("using new executable %s", cpath)
+		b.chromeBinary = cpath
+		return b, nil
+	}
+
+	return b, fmt.Errorf("failed to use new download: %w", err)
 }
 
 // NewBrowserMust with default values.
@@ -754,7 +763,7 @@ func (b *Browser) Download() error {
 // If [Browser.BinPath] is not valid it will auto download the browser to [Browser.BinPath].
 func (b *Browser) Get() (string, error) {
 	// Try to validate existing browser binaries
-	path, _, err := b.Validate()
+	path, err := b.ChooseChromePath()
 	if err == nil {
 		return path, nil
 	}
@@ -769,7 +778,7 @@ func (b *Browser) Get() (string, error) {
 	}
 
 	// Validate again with the newly downloaded binary
-	path, _, err = b.Validate()
+	path, err = b.ChooseChromePath()
 	return path, err
 }
 
@@ -780,28 +789,18 @@ func (b *Browser) MustGet() string {
 	return p
 }
 
-// Validate identifies and validates the browser binary.
-func (b *Browser) Validate() (string, string, error) {
+// GetExecutable returns the first valid Chrome executable path found.
+func (b *Browser) ChooseChromePath() (string, error) {
 	chromePaths := b.ResolveChromePaths(b.OS)
 	for _, p := range chromePaths {
 		st, err := os.Stat(p)
-		if err != nil {
+		if err != nil || st.IsDir() {
 			continue
 		}
-		if st.IsDir() {
-			b.Logger.Debugf("skipping directory path %s", p)
-			continue
-		}
-		b.Logger.Debugf("validating browser at %s", p)
-		vstr, err := b.validateAtPath(p)
-		if err == nil {
-			b.Logger.Debugf("found valid browser at %s (%s)", p, vstr)
-			return p, vstr, nil
-		}
-		b.Logger.Debugf("invalid browser at %s: %v", p, err)
+		b.Logger.Debugf("using executable %s", p)
+		return p, nil
 	}
-	b.Logger.Debugf("no valid browsers found")
-	return "", "", fmt.Errorf("no valid browser found")
+	return "", fmt.Errorf("no executable found in %+v", chromePaths)
 }
 
 // ResolveChromePaths returns a list of possibly usable Chrome executables.
@@ -886,6 +885,14 @@ func GetDefaultSystemChromeDirs(srcOS string) []string {
 			"/opt/microsoft/msedge",
 		)
 
+	case "freebsd", "netbsd", "openbsd":
+		paths = append(paths,
+			"google-chrome",
+			"chrome",
+			"ungoogled-chromium",
+			"chromium",
+		)
+
 	case "windows":
 		appNames := []string{
 			`Google\Chrome\Application`,
@@ -939,60 +946,6 @@ func GetDefaultSystemChromeExecutables(srcOS string) []string {
 		"chrome", "google-chrome", "google-chrome-beta", "google-chrome-canary", "google-chrome-unstable",
 		"chromium", "chromium-browser", "microsoft-edge",
 	}
-}
-
-// validChromeVersionPat matches a wide range of version strings, as long as they look something like:
-// "Google Chrome 143.0.7499.41"
-var validChromeVersionPat = regexp.MustCompile(`^[\w ]+ \d+\.\d+\.\d+`)
-
-// validateAtPath determines if the specified browser binary executes correctly.
-func (b *Browser) validateAtPath(path string) (string, error) {
-	tmpProfile, err := os.MkdirTemp("", "rod-browser-profile-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp profile dir: %w", err)
-	}
-	defer os.RemoveAll(tmpProfile)
-
-	stderrBuff := NewLimitedBuffer(1024)
-	stdoutBuff := NewLimitedBuffer(1024)
-
-	// Only get the Chrome version as other methods can stall indefinitely or get flagged as malware
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-	defer cancel()
-
-	// Ensure that the non-privileged user can access the profile directory and the binary
-	if err := ensureUserPermissions(b.UID, b.GID, tmpProfile, path); err != nil {
-		b.Logger.Debugf("failed to ensure user permissions for %s with profile %s: %v", path, tmpProfile, err)
-	}
-
-	//  This can stall indefinitely even with the timeout above
-	cmd := exec.CommandContext(ctx, path, "--version", "--user-data-dir="+tmpProfile) //nolint:gosec
-	cmd.SysProcAttr = getSysProcAttr(b.UID, b.GID)
-	cmd.Stdin = nil
-	cmd.Stderr = stderrBuff
-	cmd.Stdout = stdoutBuff
-
-	if b.WithEnv != nil {
-		cmd.Env = envMapToSlice(b.WithEnv)
-	} else {
-		cmd.Env = os.Environ()
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("exec failed: %s: %w", path, err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("exec error: %s: %w", path, err)
-	}
-
-	verStr := strings.TrimSpace(stdoutBuff.String())
-	b.Logger.Debugf("chrome at %s has version %q (uid:%d/gid:%d)", path, verStr, b.UID, b.GID)
-
-	if validChromeVersionPat.MatchString(verStr) {
-		return verStr, nil
-	}
-
-	return verStr, fmt.Errorf("unknown version format: %q", verStr)
 }
 
 func envMapToSlice(envMap map[string]string) []string {

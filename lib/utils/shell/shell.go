@@ -22,6 +22,8 @@ func Shell() (string, error) {
 		return nixShell()
 	case "freebsd":
 		return nixShell()
+	case "netbsd":
+		return nixShell()
 	case "android":
 		return androidShell()
 	case "darwin":
