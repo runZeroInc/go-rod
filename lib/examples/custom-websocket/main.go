@@ -15,7 +15,11 @@ import (
 )
 
 func main() {
-	w := NewWebSocket(launcher.New().MustLaunch())
+	l, err := launcher.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	w := NewWebSocket(l.MustLaunch())
 
 	client := cdp.New().Start(w)
 

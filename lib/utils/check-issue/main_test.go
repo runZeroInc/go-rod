@@ -22,6 +22,8 @@ func TestBasic(t *testing.T) {
 		"```txt\n"+
 		"5 MD040/fenced-code-language Fenced code blocks should have a language specified [Context: \"```\"]\n"+
 		"20:24 MD009/no-trailing-spaces Trailing spaces [Expected: 0 or 2; Actual: 1]\n"+
+		"(node:7410) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead\n"+
+		"(Use `node --trace-deprecation ...` to show where the warning was created)\n"+
 		"```\n"+
 		"\n"+
 		"Please fix the golang code in your markdown:\n"+
