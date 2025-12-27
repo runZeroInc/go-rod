@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -410,6 +411,7 @@ func WithHTTPClient(client *http.Client) BrowserOption {
 // WithCacheDir sets the downloaded browser cache directory.
 func WithCacheDir(dir string) BrowserOption {
 	return func(b *Browser) {
+		logrus.Errorf("setting cache to %s in %s", dir, string(debug.Stack()))
 		b.CacheDir = dir
 	}
 }
@@ -549,6 +551,7 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	}
 
 	if b.CacheDir == "" {
+		logrus.Errorf("XXXXXXXXXXX: setting default cache in %s", string(debug.Stack()))
 		cacheDirs, err := GetDefaultBrowserCacheDirs(b.OS)
 		if err != nil {
 			return nil, err
