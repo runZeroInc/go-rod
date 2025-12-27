@@ -90,13 +90,10 @@ func New(opts ...launcher.BrowserOption) *Browser {
 }
 
 func defaultEFunc(args ...interface{}) {
-	if len(args) == 0 {
-		return
+	err, ok := args[len(args)-1].(error)
+	if ok {
+		panic(err)
 	}
-	if args[0] == nil {
-		return
-	}
-	panic(args[0])
 }
 
 // Incognito creates a new incognito browser.
