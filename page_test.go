@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -134,13 +135,17 @@ func TestSetUserAgent(t *testing.T) {
 	ua := ""
 	lang := ""
 
+	mx := atomic.Int64{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	s.Mux.HandleFunc("/", func(_ http.ResponseWriter, r *http.Request) {
 		ua = r.Header.Get("User-Agent")
 		lang = r.Header.Get("Accept-Language")
-		wg.Done()
+		if mx.Add(1) == 1 {
+			// Prevent double-Done() calls with multiple requests
+			wg.Done()
+		}
 	})
 
 	g.newPage().MustSetUserAgent(nil).MustNavigate(s.URL())
