@@ -32,7 +32,7 @@ import (
 	Note that systems using MUSL instead of GLIBC (like Alpine Linux) require OS packages as well.
 */
 
-// TODO: Consider using chromedriver instead of calling chrome directly:
+// TODO: Consider using chromedriver instead of calling chromium directly:
 // - https://github.com/VibiumDev/vibium/blob/main/clicker/internal/browser/installer.go
 
 // ChromiumForTestingLatestDownloadsURL is the URL to fetch the latest Chromium-for-Testing metadata.
@@ -251,8 +251,8 @@ type Browser struct {
 	Logger              *logrus.Logger
 	HTTPClient          *http.Client
 	Timeout             time.Duration
-	UseSystemChrome     bool
-	UseChromePath       string
+	UseSystemChromium   bool
+	UseChromiumPath     string
 	UseAutomaticInstall bool
 	WindowWidth         int
 	WindowHeight        int
@@ -265,17 +265,17 @@ type Browser struct {
 	NoSandbox           bool
 	HideWindow          bool
 
-	workingDir             string
-	downloadURL            string
-	chromeDownloadRevision int
-	chromeVersion          string
-	chromeBinary           string
-	xvfbEnabled            bool
+	workingDir               string
+	downloadURL              string
+	chromiumDownloadRevision int
+	chromiumVersion          string
+	chromiumBinary           string
+	xvfbEnabled              bool
 }
 
 func (b *Browser) String() string {
-	return fmt.Sprintf("Browser{OS: %s, Arch: %s, CacheDir: %s, UseSystemChrome: %v, UseChromePath: %s, UseAutomaticInstall: %v, Revision: %d, DownloadURL: %s}",
-		b.OS, b.Arch, b.CacheDir, b.UseSystemChrome, b.UseChromePath, b.UseAutomaticInstall, b.chromeDownloadRevision, b.downloadURL)
+	return fmt.Sprintf("Browser{OS: %s, Arch: %s, CacheDir: %s, UseSystemChromium: %v, UseChromiumPath: %s, UseAutomaticInstall: %v, Revision: %d, DownloadURL: %s}",
+		b.OS, b.Arch, b.CacheDir, b.UseSystemChromium, b.UseChromiumPath, b.UseAutomaticInstall, b.chromiumDownloadRevision, b.downloadURL)
 }
 
 func (b *Browser) GetDownloadURL() string {
@@ -283,19 +283,19 @@ func (b *Browser) GetDownloadURL() string {
 }
 
 func (b *Browser) GetDownloadRevision() int {
-	return b.chromeDownloadRevision
+	return b.chromiumDownloadRevision
 }
 
-func (b *Browser) GetChromeVersion() string {
-	return b.chromeVersion
+func (b *Browser) GetChromiumVersion() string {
+	return b.chromiumVersion
 }
 
-func (b *Browser) GetChromeBinary() string {
-	return b.chromeBinary
+func (b *Browser) GetChromiumBinary() string {
+	return b.chromiumBinary
 }
 
-func (b *Browser) SetChromeBinary(v string) {
-	b.chromeBinary = v
+func (b *Browser) SetChromiumBinary(v string) {
+	b.chromiumBinary = v
 }
 
 func (b *Browser) GetWorkingDir() string {
@@ -385,15 +385,15 @@ func WithUseAutomaticInstall(auto bool) BrowserOption {
 	}
 }
 
-func WithUseChromePath(path string) BrowserOption {
+func WithUseChromiumPath(path string) BrowserOption {
 	return func(b *Browser) {
-		b.UseChromePath = path
+		b.UseChromiumPath = path
 	}
 }
 
-func WithUseSystemChrome(use bool) BrowserOption {
+func WithUseSystemChromium(use bool) BrowserOption {
 	return func(b *Browser) {
-		b.UseSystemChrome = use
+		b.UseSystemChromium = use
 	}
 }
 
@@ -468,7 +468,7 @@ func WithHideWindow(v bool) BrowserOption {
 func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	b := &Browser{
 		UseAutomaticInstall: true,
-		UseSystemChrome:     true,
+		UseSystemChromium:   true,
 		Context:             context.Background(),
 		WithExecFlags:       map[string]string{},
 		WithEnv:             map[string]string{},
@@ -507,6 +507,7 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	}
 
 	if b.CacheDir == "" {
+		logrus.Errorf("XXXXXXX: CacheDir is empty, using default")
 		cacheDirs, err := GetDefaultBrowserCacheDirs(b.OS)
 		if err != nil {
 			return nil, err
@@ -515,15 +516,15 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	}
 
 	// Prevent fallback if an explicit path is set
-	if b.UseChromePath != "" {
-		b.UseSystemChrome = false
+	if b.UseChromiumPath != "" {
+		b.UseSystemChromium = false
 		b.UseAutomaticInstall = false
 	}
 
 	// Validate that the binary is usable
-	cpath, err := b.ChooseChromePath()
+	cpath, err := b.ChooseChromiumPath()
 	if err == nil {
-		b.chromeBinary = cpath
+		b.chromiumBinary = cpath
 		return b, nil
 	}
 
@@ -532,7 +533,7 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 		return nil, err
 	}
 
-	b.Logger.Debugf("resolving the latest chrome manifest...")
+	b.Logger.Debugf("resolving the latest chromium manifest...")
 	dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
 	if err != nil {
 		return nil, err
@@ -544,21 +545,21 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 
 	// Store the download path and revision for the call to Download()
 	b.downloadURL = dpath
-	b.chromeDownloadRevision, err = strconv.Atoi(rev)
+	b.chromiumDownloadRevision, err = strconv.Atoi(rev)
 	if err != nil {
 		return nil, fmt.Errorf("bad revision '%s': %w", rev, err)
 	}
 
-	b.Logger.Debugf("chrome revision %d found at %s", b.chromeDownloadRevision, b.downloadURL)
+	b.Logger.Debugf("chromium revision %d found at %s", b.chromiumDownloadRevision, b.downloadURL)
 
 	if err := b.Download(); err != nil {
 		return nil, fmt.Errorf("automatic install failed: %w", err)
 	}
 
-	cpath, err = b.ChooseChromePath()
+	cpath, err = b.ChooseChromiumPath()
 	if err == nil {
 		b.Logger.Debugf("using new executable %s", cpath)
-		b.chromeBinary = cpath
+		b.chromiumBinary = cpath
 		return b, nil
 	}
 
@@ -576,18 +577,18 @@ func NewBrowserMust(opts ...BrowserOption) *Browser {
 
 // DownloadDir returns the browser download directory for this revision.
 func (b *Browser) DownloadDir() string {
-	return filepath.Join(b.CacheDir, fmt.Sprintf("chromium-%d", b.chromeDownloadRevision))
+	return filepath.Join(b.CacheDir, fmt.Sprintf("chromium-%d", b.chromiumDownloadRevision))
 }
 
 // BinPath returns the browser binary path.
 func (b *Browser) BinPath() string {
-	return b.UseChromePath
+	return b.UseChromiumPath
 }
 
 // Download the browser to the local cache
 func (b *Browser) Download() error {
 	// Resolve the latest download URL if not already set
-	if b.chromeDownloadRevision == 0 || b.downloadURL == "" {
+	if b.chromiumDownloadRevision == 0 || b.downloadURL == "" {
 		dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
 		if err != nil {
 			return fmt.Errorf("resolve latest download URL: %w", err)
@@ -596,7 +597,7 @@ func (b *Browser) Download() error {
 			return fmt.Errorf("unsupported platform")
 		}
 		b.downloadURL = dpath
-		b.chromeDownloadRevision, err = strconv.Atoi(rev)
+		b.chromiumDownloadRevision, err = strconv.Atoi(rev)
 		if err != nil {
 			return fmt.Errorf("bad revision '%s': %w", rev, err)
 		}
@@ -607,8 +608,8 @@ func (b *Browser) Download() error {
 	if err == nil {
 		latestRevInt, err := strconv.Atoi(strings.TrimSpace(string(latestRev)))
 		if err == nil && latestRevInt > 0 {
-			if latestRevInt >= b.chromeDownloadRevision {
-				b.Logger.Debugf("browser revision %d already installed (skipping %d)", latestRevInt, b.chromeDownloadRevision)
+			if latestRevInt >= b.chromiumDownloadRevision {
+				b.Logger.Debugf("browser revision %d already installed (skipping %d)", latestRevInt, b.chromiumDownloadRevision)
 				return nil
 			}
 		}
@@ -616,13 +617,13 @@ func (b *Browser) Download() error {
 
 	// Prepare the download directory
 	downloadDir := b.DownloadDir()
-	b.Logger.Debugf("downloading chrome revision %d from %s to %s (%s-%s)", b.chromeDownloadRevision, b.downloadURL, downloadDir, b.OS, b.Arch)
+	b.Logger.Debugf("downloading chromium revision %d from %s to %s (%s-%s)", b.chromiumDownloadRevision, b.downloadURL, downloadDir, b.OS, b.Arch)
 
 	if err := os.MkdirAll(downloadDir, 0o755); err != nil { //nolint:gosec
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	// Lock the specific Chrome revision against multiple updates
+	// Lock the specific Chromium revision against multiple updates
 	fl := flock.New(downloadDir + ".lock")
 	defer func() {
 		err := fl.Unlock()
@@ -749,11 +750,11 @@ func (b *Browser) Download() error {
 	}()
 
 	latestFile := filepath.Join(b.CacheDir, "LATEST.txt")
-	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.chromeDownloadRevision)), 0o644) //nolint:gosec
+	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.chromiumDownloadRevision)), 0o644) //nolint:gosec
 	if err != nil {
 		b.Logger.Errorf("failed to write %s: %v", latestFile, err)
 	}
-	b.Logger.Debugf("installed revision %d", b.chromeDownloadRevision)
+	b.Logger.Debugf("installed revision %d", b.chromiumDownloadRevision)
 
 	return nil
 }
@@ -762,7 +763,7 @@ func (b *Browser) Download() error {
 // If [Browser.BinPath] is not valid it will auto download the browser to [Browser.BinPath].
 func (b *Browser) Get() (string, error) {
 	// Try to validate existing browser binaries
-	path, err := b.ChooseChromePath()
+	path, err := b.ChooseChromiumPath()
 	if err == nil {
 		return path, nil
 	}
@@ -777,7 +778,7 @@ func (b *Browser) Get() (string, error) {
 	}
 
 	// Validate again with the newly downloaded binary
-	path, err = b.ChooseChromePath()
+	path, err = b.ChooseChromiumPath()
 	return path, err
 }
 
@@ -788,37 +789,37 @@ func (b *Browser) MustGet() string {
 	return p
 }
 
-// GetExecutable returns the first valid Chrome executable path found.
-func (b *Browser) ChooseChromePath() (string, error) {
-	chromePaths := b.ResolveChromePaths(b.OS)
-	for _, p := range chromePaths {
+// GetExecutable returns the first valid Chromium executable path found.
+func (b *Browser) ChooseChromiumPath() (string, error) {
+	chromiumPaths := b.ResolveChromiumPaths(b.OS)
+	for _, p := range chromiumPaths {
 		st, err := os.Stat(p)
 		if err != nil || st.IsDir() {
 			continue
 		}
 		return p, nil
 	}
-	return "", fmt.Errorf("no executable found in %+v", chromePaths)
+	return "", fmt.Errorf("no executable found in %+v", chromiumPaths)
 }
 
-// ResolveChromePaths returns a list of possibly usable Chrome executables.
-func (b *Browser) ResolveChromePaths(srcOS string) []string {
+// ResolveChromiumPaths returns a list of possibly usable Chromium executables.
+func (b *Browser) ResolveChromiumPaths(srcOS string) []string {
 	paths := []string{}
 	// If a path is specified, only use this path and don't fall back
-	if b.UseChromePath != "" {
-		paths = []string{b.UseChromePath}
+	if b.UseChromiumPath != "" {
+		paths = []string{b.UseChromiumPath}
 	} else {
-		paths = append(paths, ResolveChromePathsFromCache(srcOS, b.CacheDir)...)
-		// Check the common system chrome paths
-		if b.UseSystemChrome {
-			paths = append(paths, ResolveChromePathsFromSystem(srcOS)...)
+		paths = append(paths, ResolveChromiumPathsFromCache(srcOS, b.CacheDir)...)
+		// Check the common system chromium paths
+		if b.UseSystemChromium {
+			paths = append(paths, ResolveChromiumPathsFromSystem(srcOS)...)
 		}
 	}
 	return paths
 }
 
-// ResolveChromePathsFromCache returns a list of cached Chrome executable paths.
-func ResolveChromePathsFromCache(srcOS string, extra ...string) []string {
+// ResolveChromiumPathsFromCache returns a list of cached Chromium executable paths.
+func ResolveChromiumPathsFromCache(srcOS string, extra ...string) []string {
 	paths := []string{}
 
 	// Start with any preferred cache directory from the caller
@@ -833,7 +834,7 @@ func ResolveChromePathsFromCache(srcOS string, extra ...string) []string {
 	latestPaths := []string{}
 
 	// Search each cache directory for a LATEST.txt that points to the most
-	// recently installed version of Chrome.
+	// recently installed version of Chromium.
 	for _, p := range cacheDirs {
 		if p == "" {
 			continue
@@ -848,7 +849,7 @@ func ResolveChromePathsFromCache(srcOS string, extra ...string) []string {
 	}
 
 	for _, p := range latestPaths {
-		for _, exe := range GetDefaultSystemChromeExecutables(srcOS) {
+		for _, exe := range GetDefaultSystemChromiumExecutables(srcOS) {
 			paths = append(paths, filepath.Join(p, exe))
 		}
 	}
@@ -856,20 +857,20 @@ func ResolveChromePathsFromCache(srcOS string, extra ...string) []string {
 	return paths
 }
 
-// ResolveChromePathsFromSystem returns a list of system Chrome executable paths.
-func ResolveChromePathsFromSystem(srcOS string) []string {
+// ResolveChromiumPathsFromSystem returns a list of system Chromium executable paths.
+func ResolveChromiumPathsFromSystem(srcOS string) []string {
 	paths := []string{}
-	for _, p := range GetDefaultSystemChromeDirs(srcOS) {
-		for _, exe := range GetDefaultSystemChromeExecutables(srcOS) {
+	for _, p := range GetDefaultSystemChromiumDirs(srcOS) {
+		for _, exe := range GetDefaultSystemChromiumExecutables(srcOS) {
 			paths = append(paths, filepath.Join(p, exe))
 		}
 	}
 	return paths
 }
 
-// GetDefaultSystemChromeDirs provides a prioritized list of directories where
+// GetDefaultSystemChromiumDirs provides a prioritized list of directories where
 // system-wide browser binaries are commonly found.
-func GetDefaultSystemChromeDirs(srcOS string) []string {
+func GetDefaultSystemChromiumDirs(srcOS string) []string {
 	paths := []string{}
 	switch srcOS {
 	case "darwin":
@@ -920,9 +921,9 @@ func GetDefaultSystemChromeDirs(srcOS string) []string {
 	return paths
 }
 
-// GetDefaultSystemChromeExecutables returns an OS-specific list of relative paths to
-// Chrome binaries, to be used with a list of directories to search.
-func GetDefaultSystemChromeExecutables(srcOS string) []string {
+// GetDefaultSystemChromiumExecutables returns an OS-specific list of relative paths to
+// Chromium binaries, to be used with a list of directories to search.
+func GetDefaultSystemChromiumExecutables(srcOS string) []string {
 	switch srcOS {
 	case "windows":
 		return []string{
@@ -1004,7 +1005,7 @@ func GetDefaultBrowserCacheDirs(srcOS string) ([]string, error) {
 
 // LookPath searches for the preferred browser binary across OS-specific paths.
 func LookPath() (found string, has bool) {
-	for _, path := range ResolveChromePathsFromSystem(runtime.GOOS) {
+	for _, path := range ResolveChromiumPathsFromSystem(runtime.GOOS) {
 		var err error
 		found, err = exec.LookPath(path)
 		has = err == nil

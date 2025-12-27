@@ -323,7 +323,7 @@ func (l *Launcher) Delete(name flags.Flag) *Launcher {
 
 // Revision of the browser to auto download.
 func (l *Launcher) Revision(rev int) *Launcher {
-	l.browser.chromeDownloadRevision = rev
+	l.browser.chromiumDownloadRevision = rev
 	return l
 }
 
@@ -356,18 +356,18 @@ func (l *Launcher) XVFB(v bool) *Launcher {
 
 // Bin overrides the chrome binary path.
 func (l *Launcher) Bin(cpath string) *Launcher {
-	l.browser.SetChromeBinary(cpath)
+	l.browser.SetChromiumBinary(cpath)
 	return l
 }
 
 // GetBin returns the chrome binary path.
 func (l *Launcher) GetBin() string {
-	return l.browser.chromeBinary
+	return l.browser.chromiumBinary
 }
 
 // GetBin returns the chrome binary path.
 func (l *Launcher) GetBinVersion() string {
-	return l.browser.chromeVersion
+	return l.browser.chromiumVersion
 }
 
 // Preferences set chromium user preferences, such as set the default search engine or disable the pdf viewer.
@@ -535,7 +535,7 @@ func (l *Launcher) Launch() (string, error) {
 		return "", ErrAlreadyLaunched
 	}
 
-	bin := l.browser.GetChromeBinary()
+	bin := l.browser.GetChromiumBinary()
 	if bin == "" {
 		return "", fmt.Errorf("chrome path not resolved: %v", l.browser)
 	}

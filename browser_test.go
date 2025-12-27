@@ -529,7 +529,7 @@ func TestGetDefaultSystemChromeExecutables(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := launcher.GetDefaultSystemChromeExecutables(tt.goos)
+		got := launcher.GetDefaultSystemChromiumExecutables(tt.goos)
 		for _, want := range tt.expected {
 			found := false
 			for _, g := range got {
@@ -577,7 +577,7 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 	t.Setenv("ProgramFiles", `C:\Program Files`)
 	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
 	for _, tt := range tests {
-		got := launcher.GetDefaultSystemChromeDirs(tt.goos)
+		got := launcher.GetDefaultSystemChromiumDirs(tt.goos)
 		for _, want := range tt.expected {
 			found := false
 			for _, g := range got {
@@ -595,9 +595,9 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 
 func TestResolveChromePaths(t *testing.T) {
 	b := &launcher.Browser{
-		UseChromePath: "/custom/path/to/chrome",
+		UseChromiumPath: "/custom/path/to/chrome",
 	}
-	paths := b.ResolveChromePaths("darwin")
+	paths := b.ResolveChromiumPaths("darwin")
 	if len(paths) != 1 || paths[0] != "/custom/path/to/chrome" {
 		t.Errorf("expected only custom path, got %v", paths)
 	}
