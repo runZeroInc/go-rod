@@ -150,7 +150,8 @@ func ResolveChromeForTestingPlatform(os string, arch string) string {
 		}
 	case "windows":
 		switch arch {
-		case "amd64":
+		case "amd64",
+			"arm64": // Windows ARM64 uses the x86_64 binary via emulation
 			return "win64"
 		case "386":
 			return "win32"
@@ -181,6 +182,10 @@ type PlaywrightBrowsersMeta struct {
 // ResolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
 // It returns an error if the platform is unsupported or if there are issues fetching or parsing the metadata.
 func ResolveLatestDownloadURL(os string, arch string) (string, string, error) {
+	// Microsoft's Playwright does not support Windows ARM64 and falls back to emulation using Win64
+	if os == "windows" && arch == "arm64" {
+		arch = "amd64"
+	}
 	// First try Google Chromium-for-Testing for common platforms
 	if cftPlatform := ResolveChromeForTestingPlatform(os, arch); cftPlatform != "" {
 		var latestJSON GoogleCFTLatestDownloadsMeta
@@ -960,12 +965,19 @@ func (b *Browser) validateAtPath(path string) (string, error) {
 		b.Logger.Debugf("failed to ensure user permissions for %s with profile %s: %v", path, tmpProfile, err)
 	}
 
+	//  This can stall indefinitely even with the timeout above
 	cmd := exec.CommandContext(ctx, path, "--version", "--user-data-dir="+tmpProfile) //nolint:gosec
 	cmd.SysProcAttr = getSysProcAttr(b.UID, b.GID)
 	cmd.Stdin = nil
 	cmd.Stderr = stderrBuff
 	cmd.Stdout = stdoutBuff
-	cmd.Env = getCleanChromeEnv(b.OS, tmpProfile)
+
+	if b.WithEnv != nil {
+		cmd.Env = envMapToSlice(b.WithEnv)
+	} else {
+		cmd.Env = os.Environ()
+	}
+
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("exec failed: %s: %w", path, err)
 	}
@@ -981,6 +993,14 @@ func (b *Browser) validateAtPath(path string) (string, error) {
 	}
 
 	return verStr, fmt.Errorf("unknown version format: %q", verStr)
+}
+
+func envMapToSlice(envMap map[string]string) []string {
+	envSlice := []string{}
+	for k, v := range envMap {
+		envSlice = append(envSlice, fmt.Sprintf("%s=%s", k, v))
+	}
+	return envSlice
 }
 
 // getDefaultHomeDir returns the preferred home directory in an OS-specific way.

@@ -636,21 +636,11 @@ func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 	l.osSetupCmd(ctx, cmd, uid, gid)
 	cmd.Dir = l.browser.workingDir
 
-	// Apply user environment settings on top of a clean starting environment
-	cleanEnvMap := getCleanChromeEnvMap(runtime.GOOS, l.Get(flags.UserDataDir))
-	for _, estr := range l.browser.GetEnv() {
-		bits := strings.SplitN(estr, "=", 2)
-		if len(bits) == 1 {
-			bits = append(bits, "")
-		}
-		cleanEnvMap[bits[0]] = bits[1]
+	if l.browser.WithEnv != nil {
+		cmd.Env = envMapToSlice(l.browser.WithEnv)
+	} else {
+		cmd.Env = os.Environ()
 	}
-
-	cleanEnvStr := make([]string, 0, len(cleanEnvMap))
-	for k, v := range cleanEnvMap {
-		cleanEnvStr = append(cleanEnvStr, k+"="+v)
-	}
-	cmd.Env = cleanEnvStr
 
 	cmd.Stdout = io.MultiWriter(l.logger.Writer(), l.parser)
 	cmd.Stderr = io.MultiWriter(l.logger.Writer(), l.parser)
@@ -697,54 +687,6 @@ func (l *Launcher) Cleanup() {
 	l.Kill()
 	dir := l.Get(flags.UserDataDir)
 	_ = os.RemoveAll(dir)
-}
-
-func getCleanChromeEnvMap(srcOS string, profileDir string) map[string]string {
-	r := map[string]string{}
-	for _, ent := range os.Environ() {
-		ekey, eval, _ := strings.Cut(ent, "=")
-		ekey = strings.ToUpper(ekey)
-		if ekey == "TMP" || ekey == "TEMP" || ekey == "TMPDIR" {
-			continue
-		}
-		// Skip XDG (home, config, cache, runtime) to avoid conflicts
-		if strings.HasPrefix(ekey, "XDG_") {
-			continue
-		}
-		// Skip DBUS to avoid autolaunch delays and errors
-		if strings.HasPrefix(ekey, "DBUS_") {
-			continue
-		}
-		// Skip CHROME_* environment variables that may be set system-wide
-		if strings.HasPrefix(ekey, "CHROME") {
-			// Disable existing environment overrides (CHROME_DEBUG_LOG, CHROME_CONFIG_HOME, etc)
-			continue
-		}
-		// Skip proxy environment variables to avoid conflicts
-		if ekey == "ALL_PROXY" || ekey == "HTTP_PROXY" || ekey == "HTTPS_PROXY" || ekey == "FTP_PROXY" || ekey == "AUTO_PROXY" || ekey == "SOCKS_SERVER" || ekey == "NO_PROXY" {
-			// Disable all proxy parameters
-			continue
-		}
-		r[ekey] = eval
-	}
-
-	// Chrome needs a writeable temporary and profile directory, especially when running as a less-privileged user
-	// Without these, Chrome will fail wth errors like:
-	// - chrome_crashpad_handler: --database is required - Try 'chrome_crashpad_handler --help' for more information.
-	tmpOverrides := []string{"TMP", "TEMP", "TMPDIR", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"}
-	for _, ekey := range tmpOverrides {
-		r[ekey] = profileDir
-	}
-	return r
-}
-
-func getCleanChromeEnv(srcOS string, profileDir string) []string {
-	m := getCleanChromeEnvMap(srcOS, profileDir)
-	r := make([]string, 0, len(m))
-	for k, v := range m {
-		r = append(r, k+"="+v)
-	}
-	return r
 }
 
 func ensureUserPermissions(uid, gid int, userDir, binPath string) error {
