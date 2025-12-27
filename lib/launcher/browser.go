@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -178,9 +179,53 @@ type PlaywrightBrowsersMeta struct {
 	} `json:"browsers"`
 }
 
-// ResolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
+const chromiumDownloadURLCacheTimeout = time.Hour * 24
+
+var chromiumDownloadURLCacheSync = sync.Mutex{}
+
+var chromiumDownloadURLCache = map[string]*struct {
+	URL       string
+	Revision  string
+	LastCheck time.Time
+	sync.Mutex
+}{}
+
+// ResolveLatestDownloadURLWithCache fetches the latest Chromium download URL with caching to reduce network calls.
+func ResolveLatestDownloadURLWithCache(os string, arch string) (string, string, error) {
+	// Check the top-level cache with a lock
+	chromiumDownloadURLCacheSync.Lock()
+	cacheKey := os + "-" + arch
+	res, ok := chromiumDownloadURLCache[cacheKey]
+	if !ok {
+		res = &struct {
+			URL       string
+			Revision  string
+			LastCheck time.Time
+			sync.Mutex
+		}{}
+		chromiumDownloadURLCache[cacheKey] = res
+	}
+	chromiumDownloadURLCacheSync.Unlock()
+
+	// Check the os+arch specific cache with its own lock
+	res.Lock()
+	defer res.Unlock()
+	if time.Since(res.LastCheck) > chromiumDownloadURLCacheTimeout {
+		url, rev, err := resolveLatestDownloadURL(os, arch)
+		if err == nil {
+			res.URL = url
+			res.Revision = rev
+			res.LastCheck = time.Now()
+			return url, rev, nil
+		}
+		return url, rev, err
+	}
+	return res.URL, res.Revision, nil
+}
+
+// resolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
 // It returns an error if the platform is unsupported or if there are issues fetching or parsing the metadata.
-func ResolveLatestDownloadURL(os string, arch string) (string, string, error) {
+func resolveLatestDownloadURL(os string, arch string) (string, string, error) {
 	// Microsoft's Playwright does not support Windows ARM64 and falls back to emulation using Win64
 	if os == "windows" && arch == "arm64" {
 		arch = "amd64"
@@ -265,25 +310,22 @@ type Browser struct {
 	NoSandbox           bool
 	HideWindow          bool
 
-	workingDir               string
-	downloadURL              string
-	chromiumDownloadRevision int
-	chromiumVersion          string
-	chromiumBinary           string
-	xvfbEnabled              bool
+	workingDir        string
+	installedRevision int
+	latestRevision    int
+	chromiumVersion   string
+	chromiumBinary    string
+	xvfbEnabled       bool
 }
 
 func (b *Browser) String() string {
-	return fmt.Sprintf("Browser{OS: %s, Arch: %s, CacheDir: %s, UseSystemChromium: %v, UseChromiumPath: %s, UseAutomaticInstall: %v, Revision: %d, DownloadURL: %s}",
-		b.OS, b.Arch, b.CacheDir, b.UseSystemChromium, b.UseChromiumPath, b.UseAutomaticInstall, b.chromiumDownloadRevision, b.downloadURL)
-}
-
-func (b *Browser) GetDownloadURL() string {
-	return b.downloadURL
+	return fmt.Sprintf("Browser{OS: %s, Arch: %s, CacheDir: %s, UseSystemChromium: %v, UseChromiumPath: %s, UseAutomaticInstall: %v, InstalledRevision: %d, LatestRevision: %d}",
+		b.OS, b.Arch, b.CacheDir, b.UseSystemChromium, b.UseChromiumPath, b.UseAutomaticInstall, b.installedRevision, b.latestRevision,
+	)
 }
 
 func (b *Browser) GetDownloadRevision() int {
-	return b.chromiumDownloadRevision
+	return b.latestRevision
 }
 
 func (b *Browser) GetChromiumVersion() string {
@@ -507,7 +549,6 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	}
 
 	if b.CacheDir == "" {
-		logrus.Errorf("XXXXXXX: CacheDir is empty, using default")
 		cacheDirs, err := GetDefaultBrowserCacheDirs(b.OS)
 		if err != nil {
 			return nil, err
@@ -521,49 +562,28 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 		b.UseAutomaticInstall = false
 	}
 
-	// Validate that the binary is usable
-	cpath, err := b.ChooseChromiumPath()
-	if err == nil {
-		b.chromiumBinary = cpath
-		return b, nil
-	}
-
+	// Return the existing binary or an error if automatic installs are disabled
 	if !b.UseAutomaticInstall {
-		// No local installation and online updates are disabled
-		return nil, err
+		cpath, err := b.ChooseChromiumPath()
+		if err == nil {
+			b.chromiumBinary = cpath
+		}
+		return b, err
 	}
 
-	b.Logger.Debugf("resolving the latest chromium manifest...")
-	dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
-	if err != nil {
-		return nil, err
-	}
-
-	if dpath == "" {
-		return nil, fmt.Errorf("unsupported platform")
-	}
-
-	// Store the download path and revision for the call to Download()
-	b.downloadURL = dpath
-	b.chromiumDownloadRevision, err = strconv.Atoi(rev)
-	if err != nil {
-		return nil, fmt.Errorf("bad revision '%s': %w", rev, err)
-	}
-
-	b.Logger.Debugf("chromium revision %d found at %s", b.chromiumDownloadRevision, b.downloadURL)
-
-	if err := b.Download(); err != nil {
+	// Check for updates and install as needed
+	if err := b.DownloadAndInstall(); err != nil {
 		return nil, fmt.Errorf("automatic install failed: %w", err)
 	}
 
-	cpath, err = b.ChooseChromiumPath()
+	cpath, err := b.ChooseChromiumPath()
 	if err == nil {
-		b.Logger.Debugf("using new executable %s", cpath)
+		b.Logger.Debugf("using executable %s", cpath)
 		b.chromiumBinary = cpath
 		return b, nil
 	}
 
-	return b, fmt.Errorf("failed to use new download: %w", err)
+	return b, fmt.Errorf("failed to install chromium: %w", err)
 }
 
 // NewBrowserMust with default values.
@@ -576,8 +596,8 @@ func NewBrowserMust(opts ...BrowserOption) *Browser {
 }
 
 // DownloadDir returns the browser download directory for this revision.
-func (b *Browser) DownloadDir() string {
-	return filepath.Join(b.CacheDir, fmt.Sprintf("chromium-%d", b.chromiumDownloadRevision))
+func (b *Browser) DownloadDir(revision int) string {
+	return filepath.Join(b.CacheDir, fmt.Sprintf("chromium-%d", revision))
 }
 
 // BinPath returns the browser binary path.
@@ -585,39 +605,40 @@ func (b *Browser) BinPath() string {
 	return b.UseChromiumPath
 }
 
-// Download the browser to the local cache
-func (b *Browser) Download() error {
-	// Resolve the latest download URL if not already set
-	if b.chromiumDownloadRevision == 0 || b.downloadURL == "" {
-		dpath, rev, err := ResolveLatestDownloadURL(b.OS, b.Arch)
-		if err != nil {
-			return fmt.Errorf("resolve latest download URL: %w", err)
-		}
-		if dpath == "" {
-			return fmt.Errorf("unsupported platform")
-		}
-		b.downloadURL = dpath
-		b.chromiumDownloadRevision, err = strconv.Atoi(rev)
-		if err != nil {
-			return fmt.Errorf("bad revision '%s': %w", rev, err)
+// DownloadAndInstall downloads and installs the latest browser if needed.
+func (b *Browser) DownloadAndInstall() error {
+	// Resolve the locally installed revision in the cache
+	installedRev, err := os.ReadFile(filepath.Join(b.CacheDir, "LATEST.txt"))
+	if err == nil {
+		installedRevInt, err := strconv.Atoi(strings.TrimSpace(string(installedRev)))
+		if err == nil && installedRevInt > 0 {
+			b.installedRevision = installedRevInt
 		}
 	}
 
-	// Check to see if we've already downloaded this versions
-	latestRev, err := os.ReadFile(filepath.Join(b.CacheDir, "LATEST.txt"))
-	if err == nil {
-		latestRevInt, err := strconv.Atoi(strings.TrimSpace(string(latestRev)))
-		if err == nil && latestRevInt > 0 {
-			if latestRevInt >= b.chromiumDownloadRevision {
-				b.Logger.Debugf("browser revision %d already installed (skipping %d)", latestRevInt, b.chromiumDownloadRevision)
-				return nil
-			}
-		}
+	// Get the latest revision available (cached)
+	dpath, rev, err := ResolveLatestDownloadURLWithCache(b.OS, b.Arch)
+	if err != nil {
+		return fmt.Errorf("resolve latest download URL: %w", err)
+	}
+	if dpath == "" {
+		return fmt.Errorf("unsupported platform")
+	}
+	downloadRev, err := strconv.Atoi(rev)
+	if err != nil {
+		return fmt.Errorf("bad update revision '%s': %w", rev, err)
+	}
+	b.latestRevision = downloadRev
+
+	// No upgrade needed
+	if b.installedRevision >= downloadRev {
+		b.Logger.Debugf("no upgrade needed from revision %d to %d from %s", b.installedRevision, downloadRev, dpath)
+		return nil
 	}
 
 	// Prepare the download directory
-	downloadDir := b.DownloadDir()
-	b.Logger.Debugf("downloading chromium revision %d from %s to %s (%s-%s)", b.chromiumDownloadRevision, b.downloadURL, downloadDir, b.OS, b.Arch)
+	downloadDir := b.DownloadDir(downloadRev)
+	b.Logger.Debugf("upgrading from revision %d to %d from %s to %s (%s-%s)", b.installedRevision, downloadRev, dpath, downloadDir, b.OS, b.Arch)
 
 	if err := os.MkdirAll(downloadDir, 0o755); err != nil { //nolint:gosec
 		return fmt.Errorf("failed to create download directory: %w", err)
@@ -642,14 +663,29 @@ func (b *Browser) Download() error {
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp("", "go-rod-chromium-*.zip")
+	// Clear any leftover temporary zip files from the target directory
+	files, err := os.ReadDir(downloadDir)
+	if err != nil {
+		b.Logger.Errorf("failed to read download directory: %v", err)
+	} else {
+		for _, file := range files {
+			if strings.HasPrefix(file.Name(), "go-rod-chromium-") && strings.HasSuffix(file.Name(), ".zip") {
+				err := os.Remove(filepath.Join(downloadDir, file.Name()))
+				if err != nil {
+					b.Logger.Errorf("failed to remove leftover zip file %s: %v", file.Name(), err)
+				}
+			}
+		}
+	}
+
+	tmpFile, err := os.CreateTemp(downloadDir, "go-rod-chromium-*.zip")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpName := tmpFile.Name()
 	defer os.Remove(tmpName)
 
-	req, err := http.NewRequestWithContext(b.Context, http.MethodGet, b.downloadURL, nil)
+	req, err := http.NewRequestWithContext(b.Context, http.MethodGet, dpath, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -695,8 +731,7 @@ func (b *Browser) Download() error {
 	}
 
 	for _, f := range zr.File {
-
-		fpath, err := cleanZipFileName(b.DownloadDir(), f.Name, 1)
+		fpath, err := cleanZipFileName(b.DownloadDir(downloadRev), f.Name, 1)
 		if err != nil {
 			b.Logger.Debugf("skipping extracting of %s: %v", f.Name, err)
 			continue
@@ -750,12 +785,12 @@ func (b *Browser) Download() error {
 	}()
 
 	latestFile := filepath.Join(b.CacheDir, "LATEST.txt")
-	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.chromiumDownloadRevision)), 0o644) //nolint:gosec
+	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.latestRevision)), 0o644) //nolint:gosec
 	if err != nil {
 		b.Logger.Errorf("failed to write %s: %v", latestFile, err)
 	}
-	b.Logger.Debugf("installed revision %d", b.chromiumDownloadRevision)
-
+	b.Logger.Debugf("upgraded from revision %d to %d", b.installedRevision, b.latestRevision)
+	b.installedRevision = b.latestRevision
 	return nil
 }
 
@@ -772,7 +807,7 @@ func (b *Browser) Get() (string, error) {
 	}
 
 	// Try to download the latest browser binary into the cache
-	err = b.Download()
+	err = b.DownloadAndInstall()
 	if err != nil {
 		return "", fmt.Errorf("download: %w", err)
 	}

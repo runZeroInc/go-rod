@@ -323,7 +323,7 @@ func (l *Launcher) Delete(name flags.Flag) *Launcher {
 
 // Revision of the browser to auto download.
 func (l *Launcher) Revision(rev int) *Launcher {
-	l.browser.chromiumDownloadRevision = rev
+	l.browser.latestRevision = rev
 	return l
 }
 

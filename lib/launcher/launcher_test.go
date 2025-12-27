@@ -271,7 +271,7 @@ func Test_ResolveDownloadURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, rev, err := launcher.ResolveLatestDownloadURL(tt.platform.os, tt.platform.arch)
+			got, rev, err := launcher.ResolveLatestDownloadURLWithCache(tt.platform.os, tt.platform.arch)
 			if err != nil {
 				t.Fatalf("ResolveLatestDownloadURL() error = %v", err)
 			}
@@ -295,7 +295,7 @@ func Test_ResolveDownloader(t *testing.T) {
 		t.Fatalf("NewBrowser() error = %v", err)
 	}
 
-	err = b.Download()
+	err = b.DownloadAndInstall()
 	if err != nil {
 		t.Fatalf("Browser.Download() error = %v", err)
 	}
