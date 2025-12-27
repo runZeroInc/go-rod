@@ -35,8 +35,8 @@ import (
 // TODO: Consider using chromedriver instead of calling chrome directly:
 // - https://github.com/VibiumDev/vibium/blob/main/clicker/internal/browser/installer.go
 
-// ChromeForTestingLatestDownloadsURL is the URL to fetch the latest Chromium-for-Testing metadata.
-const ChromeForTestingLatestDownloadsURL = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+// ChromiumForTestingLatestDownloadsURL is the URL to fetch the latest Chromium-for-Testing metadata.
+const ChromiumForTestingLatestDownloadsURL = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
 
 // MaxPackageFileSize sets a per-file limit for package extraction.
 const MaxPackageFileSize = 1024 * 1024 * 1024 // 1GiB
@@ -133,8 +133,8 @@ type GoogleCFTLatestDownloadsMeta struct {
 	} `json:"channels"`
 }
 
-// ResolveChromeForTestingPlatform maps OS and architecture to Chromium-for-Testing platform strings.
-func ResolveChromeForTestingPlatform(os string, arch string) string {
+// ResolveChromiumForTestingPlatform maps OS and architecture to Chromium-for-Testing platform strings.
+func ResolveChromiumForTestingPlatform(os string, arch string) string {
 	switch os {
 	case "darwin":
 		switch arch {
@@ -186,9 +186,9 @@ func ResolveLatestDownloadURL(os string, arch string) (string, string, error) {
 		arch = "amd64"
 	}
 	// First try Google Chromium-for-Testing for common platforms
-	if cftPlatform := ResolveChromeForTestingPlatform(os, arch); cftPlatform != "" {
+	if cftPlatform := ResolveChromiumForTestingPlatform(os, arch); cftPlatform != "" {
 		var latestJSON GoogleCFTLatestDownloadsMeta
-		if err := downloadAndParseJSON(ChromeForTestingLatestDownloadsURL, &latestJSON); err != nil {
+		if err := downloadAndParseJSON(ChromiumForTestingLatestDownloadsURL, &latestJSON); err != nil {
 			return "", "", err
 		}
 		stable := latestJSON.Channels.Stable
@@ -523,7 +523,6 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	// Validate that the binary is usable
 	cpath, err := b.ChooseChromePath()
 	if err == nil {
-		b.Logger.Debugf("using executable %s", cpath)
 		b.chromeBinary = cpath
 		return b, nil
 	}
@@ -797,7 +796,6 @@ func (b *Browser) ChooseChromePath() (string, error) {
 		if err != nil || st.IsDir() {
 			continue
 		}
-		b.Logger.Debugf("using executable %s", p)
 		return p, nil
 	}
 	return "", fmt.Errorf("no executable found in %+v", chromePaths)
