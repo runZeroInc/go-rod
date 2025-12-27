@@ -607,6 +607,15 @@ func (b *Browser) BinPath() string {
 
 // DownloadAndInstall downloads and installs the latest browser if needed.
 func (b *Browser) DownloadAndInstall() error {
+	// Acquire a lock on the LATEST.txt file to prevent multiple concurrent updates
+	fl2 := flock.New(filepath.Join(b.CacheDir, "LATEST.txt.lock"))
+	defer func() {
+		err := fl2.Unlock()
+		if err != nil {
+			b.Logger.Errorf("failed to unlock flock: %v", err)
+		}
+	}()
+
 	// Resolve the locally installed revision in the cache
 	installedRev, err := os.ReadFile(filepath.Join(b.CacheDir, "LATEST.txt"))
 	if err == nil {
@@ -615,6 +624,8 @@ func (b *Browser) DownloadAndInstall() error {
 			b.installedRevision = installedRevInt
 		}
 	}
+
+	// Continue holding the LATEST.txt lock until the upgrade is done
 
 	// Get the latest revision available (cached)
 	dpath, rev, err := ResolveLatestDownloadURLWithCache(b.OS, b.Arch)
@@ -654,7 +665,7 @@ func (b *Browser) DownloadAndInstall() error {
 	}()
 
 	ctx := context.Background()
-	ok, err := fl.TryLockContext(ctx, time.Minute)
+	ok, err := fl.TryLockContext(ctx, time.Hour)
 	if !ok {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
@@ -775,14 +786,6 @@ func (b *Browser) DownloadAndInstall() error {
 		_ = rc.Close()
 		_ = outFile.Close()
 	}
-
-	fl2 := flock.New(filepath.Join(b.CacheDir, "LATEST.txt.lock"))
-	defer func() {
-		err := fl2.Unlock()
-		if err != nil {
-			b.Logger.Errorf("failed to unlock flock: %v", err)
-		}
-	}()
 
 	latestFile := filepath.Join(b.CacheDir, "LATEST.txt")
 	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.latestRevision)), 0o644) //nolint:gosec
