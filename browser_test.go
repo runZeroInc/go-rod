@@ -503,7 +503,7 @@ func TestGetDefaultSystemChromeExecutables(t *testing.T) {
 		{
 			goos: "windows",
 			expected: []string{
-				"chrome.exe", "chromium.exe",
+				"chrome.exe", "chromium.exe", "msedge.exe",
 			},
 		},
 		{
@@ -515,14 +515,15 @@ func TestGetDefaultSystemChromeExecutables(t *testing.T) {
 				"Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
 				"Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
 				"Chromium.app/Contents/MacOS/Chromium",
-				"chrome", "chromium",
+				"Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+				"chrome", "chromium", "microsoft-edge",
 			},
 		},
 		{
 			goos: "linux",
 			expected: []string{
 				"chrome", "google-chrome", "google-chrome-beta", "google-chrome-canary", "google-chrome-unstable",
-				"chromium", "chromium-browser",
+				"chromium", "chromium-browser", "microsoft-edge",
 			},
 		},
 	}
@@ -559,12 +560,15 @@ func TestGetDefaultSystemChromeDirs(t *testing.T) {
 				"/opt/google/chrome", "/opt/google/chrome-beta", "/opt/google/chrome-canary", "/opt/google/chrome-unstable",
 				"/usr/bin", "/usr/local/bin",
 				"/data/data/com.termux/files/usr/bin",
+				"/opt/microsoft/msedge",
 			},
 		},
 		{
 			goos: "windows",
 			expected: []string{
 				`C:\Program Files (x86)\Google\Chrome\Application`,
+				`C:\Program Files\Microsoft\Edge\Application`,
+				`C:\Users\TestUser\AppData\Local\Microsoft\Edge\Application`,
 			},
 		},
 	}

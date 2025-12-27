@@ -181,11 +181,6 @@ type PlaywrightBrowsersMeta struct {
 // ResolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
 // It returns an error if the platform is unsupported or if there are issues fetching or parsing the metadata.
 func ResolveLatestDownloadURL(os string, arch string) (string, string, error) {
-	// Microsoft's Playwright does not support Windows ARM64 and falls back to emulation using Win64
-	if os == "windows" && arch == "arm64" {
-		arch = "amd64"
-	}
-
 	// First try Google Chromium-for-Testing for common platforms
 	if cftPlatform := ResolveChromeForTestingPlatform(os, arch); cftPlatform != "" {
 		var latestJSON GoogleCFTLatestDownloadsMeta
@@ -883,6 +878,7 @@ func GetDefaultSystemChromeDirs(srcOS string) []string {
 			"/opt/google/chrome", "/opt/google/chrome-beta", "/opt/google/chrome-canary", "/opt/google/chrome-unstable",
 			"/usr/bin", "/usr/local/bin",
 			"/data/data/com.termux/files/usr/bin",
+			"/opt/microsoft/msedge",
 		)
 
 	case "windows":
@@ -893,6 +889,7 @@ func GetDefaultSystemChromeDirs(srcOS string) []string {
 			`Google\Chrome SxS\Application`,
 			`Google\Chrome Dev\Application`,
 			`Chromium\Application`,
+			`Microsoft\Edge\Application`,
 		}
 
 		envNames := []string{"LocalAppData", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"}
@@ -919,7 +916,7 @@ func GetDefaultSystemChromeExecutables(srcOS string) []string {
 	switch srcOS {
 	case "windows":
 		return []string{
-			`chrome.exe`, `chromium.exe`,
+			`chrome.exe`, `chromium.exe`, `msedge.exe`,
 		}
 	case "darwin":
 		return []string{
@@ -929,11 +926,13 @@ func GetDefaultSystemChromeExecutables(srcOS string) []string {
 			`Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary`,
 			`Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev`,
 			`Chromium.app/Contents/MacOS/Chromium`,
+			`Microsoft Edge.app/Contents/MacOS/Microsoft Edge`,
+			`chrome`, `chromium`, `microsoft-edge`,
 		}
 	}
 	return []string{
 		"chrome", "google-chrome", "google-chrome-beta", "google-chrome-canary", "google-chrome-unstable",
-		"chromium", "chromium-browser",
+		"chromium", "chromium-browser", "microsoft-edge",
 	}
 }
 
