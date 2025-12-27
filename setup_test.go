@@ -102,9 +102,10 @@ func newTester() *G {
 	}
 
 	return &G{
-		mc:      mc,
-		browser: browser,
-		page:    page,
+		mc:            mc,
+		browser:       browser,
+		page:          page,
+		cancelTimeout: func() {},
 	}
 }
 
