@@ -443,9 +443,7 @@ func TestBrowserConnectFailure(t *testing.T) {
 
 func TestBrowserPool(t *testing.T) {
 	g := got.T(t)
-
 	pool := rod.NewBrowserPool(3)
-
 	b, err := pool.Get(func() (*rod.Browser, error) {
 		browser := rod.New()
 		return browser, browser.Connect()
@@ -453,7 +451,9 @@ func TestBrowserPool(t *testing.T) {
 	g.E(err)
 	pool.Put(b)
 
-	b = pool.MustGet(func() *rod.Browser { return rod.New().MustConnect() })
+	b = pool.MustGet(func() *rod.Browser {
+		return rod.New().MustConnect()
+	})
 	pool.Put(b)
 
 	pool.Cleanup(func(p *rod.Browser) {

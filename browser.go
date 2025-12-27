@@ -85,7 +85,18 @@ func New(opts ...launcher.BrowserOption) *Browser {
 		targetsLock:   &sync.Mutex{},
 		defaultDevice: devices.LaptopWithMDPIScreen.Landscape(),
 		launchOptions: opts,
+		e:             defaultEFunc,
 	}
+}
+
+func defaultEFunc(args ...interface{}) {
+	if len(args) == 0 {
+		return
+	}
+	if args[0] == nil {
+		return
+	}
+	panic(args[0])
 }
 
 // Incognito creates a new incognito browser.
