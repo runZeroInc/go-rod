@@ -1,6 +1,7 @@
 package launcher_test
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runZeroInc/go-rod/lib/launcher"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
@@ -294,9 +296,34 @@ func Test_ResolveDownloader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBrowser() error = %v", err)
 	}
-
 	err = b.DownloadAndInstall()
 	if err != nil {
 		t.Fatalf("Browser.Download() error = %v", err)
+	}
+}
+
+func TestLaunchGetURLTimeoutSkipped(t *testing.T) {
+	stime := time.Now()
+	l := launcher.NewMust(launcher.WithContext(context.Background())).Bin("sleep")
+	l.LaunchTimeout(time.Second * 5)
+	l.Flags = map[flags.Flag][]string{
+		flags.Arguments: {"1"},
+	}
+	_, _ = l.Launch()
+	if time.Since(stime) > time.Second*2 {
+		t.Errorf("launch timeout enforced incorrectly")
+	}
+}
+
+func TestLaunchGetURLTimeoutReached(t *testing.T) {
+	stime := time.Now()
+	l := launcher.NewMust(launcher.WithContext(context.Background())).Bin("sleep")
+	l.LaunchTimeout(time.Second * 1)
+	l.Flags = map[flags.Flag][]string{
+		flags.Arguments: {"5"},
+	}
+	_, _ = l.Launch()
+	if time.Since(stime) > time.Second*4 {
+		t.Errorf("launch timeout not enforced")
 	}
 }

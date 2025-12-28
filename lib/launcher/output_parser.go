@@ -3,12 +3,14 @@ package launcher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/runZeroInc/go-rod/pkg/gson"
@@ -119,13 +121,25 @@ func ResolveURL(u string) (string, error) {
 	parsed = toHTTP(*parsed)
 	parsed.Path = "/json/version"
 
-	res, err := http.Get(parsed.String()) //nolint: noctx
+	req, err := http.NewRequest("GET", parsed.String(), nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("resolve url failed to create request for %s: %w", parsed.String(), err)
 	}
-	defer func() { _ = res.Body.Close() }()
 
-	data, err := io.ReadAll(res.Body)
+	ctx, cancel := context.WithTimeout(req.Context(), time.Minute)
+	defer cancel()
+
+	req = req.WithContext(ctx)
+	client := http.DefaultClient
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("resolve url failed to request %s: %w", parsed.String(), err)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(res.Body, 1024*1024))
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+
 	utils.E(err)
 
 	wsURL := gson.New(data).Get("webSocketDebuggerUrl").Str()

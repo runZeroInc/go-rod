@@ -15,12 +15,16 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/runZeroInc/go-rod/lib/defaults"
 	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 	"github.com/runZeroInc/go-rod/lib/utils"
 	"github.com/sirupsen/logrus"
 )
+
+// DefaultLaunchTimeout sets a limit for getting the debug url when launching the browser.
+const DefaultLaunchTimeout = time.Minute * 3
 
 // DefaultUserDataDirPrefix ...
 var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "go-rod-user-data")
@@ -88,19 +92,16 @@ var DefaultExecFlags = map[string][]string{
 
 // Launcher is a helper to launch browser binary smartly.
 type Launcher struct {
-	Flags map[flags.Flag][]string `json:"flags"`
-
-	ctx       context.Context
-	ctxCancel func()
-
-	logger *logrus.Logger
-
-	browser *Browser
-	parser  *ChromiumOutputParser
-	pid     int
-	exit    chan struct{}
-
-	isLaunched int32 // zero means not launched
+	Flags         map[flags.Flag][]string `json:"flags"`
+	ctx           context.Context
+	ctxCancel     func()
+	logger        *logrus.Logger
+	browser       *Browser
+	parser        *ChromiumOutputParser
+	pid           int
+	exit          chan struct{}
+	launchTimeout time.Duration
+	isLaunched    int32 // zero means not launched
 }
 
 // New returns a launcher instance with the configured options.
@@ -361,6 +362,12 @@ func (l *Launcher) Bin(cpath string) *Launcher {
 	return l
 }
 
+// LaunchTimeout sets the timeout for launching the browser and getting the debug url.
+func (l *Launcher) LaunchTimeout(timeout time.Duration) *Launcher {
+	l.launchTimeout = timeout
+	return l
+}
+
 // GetBin returns the chrome binary path.
 func (l *Launcher) GetBin() string {
 	return l.browser.chromiumBinary
@@ -577,13 +584,30 @@ func (l *Launcher) Launch() (string, error) {
 		killLeftoverProcesses(l.pid, bin)
 	}()
 
+	lt := l.launchTimeout
+	if lt == 0 {
+		lt = DefaultLaunchTimeout
+	}
+	t := time.NewTimer(lt)
+
+	// Prevent a stall if the Chrome process doesn't launch correctly
+	go func() {
+		select {
+		case <-t.C:
+			l.ctxCancel()
+		case <-l.exit:
+		}
+	}()
+
+	// Wait for the Devtools debug URL
 	u, err = l.getURL()
+	t.Stop()
+
 	if err != nil {
 		killLeftoverProcesses(l.pid, bin)
 		l.ctxCancel()
 		return "", err
 	}
-
 	return ResolveURL(u)
 }
 
