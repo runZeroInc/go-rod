@@ -573,7 +573,8 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 
 	// Check for updates and install as needed
 	if err := b.DownloadAndInstall(); err != nil {
-		return nil, fmt.Errorf("automatic install failed: %w", err)
+		b.Logger.Errorf("automatic install failed: %v", err)
+		// Fallback to system chromium if allowed
 	}
 
 	cpath, err := b.ChooseChromiumPath()
@@ -725,7 +726,35 @@ func (b *Browser) DownloadAndInstall() error {
 
 	b.Logger.Debugf("downloaded %d bytes", n)
 
-	fd, err := os.Open(tmpName) //nolint:gosec
+	// Unzip with size limit, retrying on failure to handle transient issues
+	// due to anti-malware tools and similar interference.
+	retries := 0
+	for {
+		err = b.unzipWithSizeLimit(tmpName, downloadDir)
+		if err == nil {
+			break
+		}
+		retries++
+		if retries >= 3 {
+			return fmt.Errorf("failed to unzip package after %d attempts: %w", retries, err)
+		}
+		b.Logger.Errorf("failed to unzip package (%d): %v", retries, err)
+		time.Sleep(time.Second)
+	}
+
+	latestFile := filepath.Join(b.CacheDir, "LATEST.txt")
+	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.latestRevision)), 0o644) //nolint:gosec
+	if err != nil {
+		b.Logger.Errorf("failed to write %s: %v", latestFile, err)
+	}
+	b.Logger.Debugf("upgraded from revision %d to %d", b.installedRevision, b.latestRevision)
+	b.installedRevision = b.latestRevision
+	return nil
+}
+
+// unzipWithSizeLimit extracts a zip file to the specified destination with per-file and total size limits.
+func (b *Browser) unzipWithSizeLimit(src string, dest string) error {
+	fd, err := os.Open(src) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("failed to open zip file: %w", err)
 	}
@@ -742,7 +771,7 @@ func (b *Browser) DownloadAndInstall() error {
 	}
 
 	for _, f := range zr.File {
-		fpath, err := cleanZipFileName(b.DownloadDir(downloadRev), f.Name, 1)
+		fpath, err := cleanZipFileName(dest, f.Name, 1)
 		if err != nil {
 			b.Logger.Debugf("skipping extracting of %s: %v", f.Name, err)
 			continue
@@ -786,14 +815,6 @@ func (b *Browser) DownloadAndInstall() error {
 		_ = rc.Close()
 		_ = outFile.Close()
 	}
-
-	latestFile := filepath.Join(b.CacheDir, "LATEST.txt")
-	err = os.WriteFile(latestFile, []byte(strconv.Itoa(b.latestRevision)), 0o644) //nolint:gosec
-	if err != nil {
-		b.Logger.Errorf("failed to write %s: %v", latestFile, err)
-	}
-	b.Logger.Debugf("upgraded from revision %d to %d", b.installedRevision, b.latestRevision)
-	b.installedRevision = b.latestRevision
 	return nil
 }
 
