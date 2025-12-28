@@ -50,19 +50,19 @@ func (r *ChromiumOutputParser) Write(p []byte) (n int, err error) {
 
 	if !r.done {
 		r.Buffer += string(p)
-
 		str := regWS.FindString(r.Buffer)
 		if str != "" {
 			u, err := url.Parse(strings.TrimSpace(str))
 			utils.E(err)
-
 			select {
 			case <-r.ctx.Done():
 			case r.URL <- "http://" + u.Host:
 			}
-
 			r.done = true
 			r.Buffer = ""
+		}
+		if len(r.Buffer) > 4096 {
+			r.Buffer = r.Buffer[128:]
 		}
 	}
 

@@ -608,7 +608,7 @@ func (b *Browser) BinPath() string {
 
 // DownloadAndInstall downloads and installs the latest browser if needed.
 func (b *Browser) DownloadAndInstall() error {
-	// Acquire a lock on the LATEST.txt file to prevent multiple concurrent updates
+	// Acquire a lock on the LATEST.txt file to prevent conflicts
 	fl2 := flock.New(filepath.Join(b.CacheDir, "LATEST.txt.lock"))
 	defer func() {
 		err := fl2.Unlock()

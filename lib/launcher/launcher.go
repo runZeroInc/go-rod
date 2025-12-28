@@ -2,6 +2,7 @@
 package launcher
 
 import (
+	"bufio"
 	"context"
 	"crypto"
 	"errors"
@@ -624,8 +625,29 @@ func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 		cmd.Env = os.Environ()
 	}
 
-	cmd.Stdout = io.MultiWriter(l.logger.Writer(), l.parser)
-	cmd.Stderr = io.MultiWriter(l.logger.Writer(), l.parser)
+	stdoutR, stdoutW := io.Pipe()
+	stderrR, stderrW := io.Pipe()
+
+	outToLog := func(r io.Reader, n string) {
+		defer func() {
+			if r := recover(); r != nil {
+				l.logger.Errorf("panic in cmd %s reader: %v", n, r)
+			}
+		}()
+		s := bufio.NewScanner(r)
+		for s.Scan() {
+			line := strings.TrimSpace(s.Text())
+			if line != "" {
+				l.logger.Debugf("chrome-debug-%s: %s", n, line)
+			}
+		}
+	}
+
+	go outToLog(stdoutR, "stdout")
+	go outToLog(stderrR, "stderr")
+
+	cmd.Stdout = io.MultiWriter(stdoutW, l.parser)
+	cmd.Stderr = io.MultiWriter(stderrW, l.parser)
 }
 
 func (l *Launcher) getURL() (u string, err error) {
