@@ -144,13 +144,14 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 	}
 
 	l := &Launcher{
-		ctx:       ctx,
-		ctxCancel: cancel,
-		Flags:     execFlags,
-		exit:      make(chan struct{}),
-		browser:   browser,
-		parser:    NewChromiumOutputParser(),
-		logger:    conf.Logger,
+		ctx:           ctx,
+		ctxCancel:     cancel,
+		Flags:         execFlags,
+		exit:          make(chan struct{}),
+		browser:       browser,
+		parser:        NewChromiumOutputParser(),
+		logger:        conf.Logger,
+		launchTimeout: browser.LaunchTimeout,
 	}
 	l = l.WindowSize(conf.WindowWidth, conf.WindowHeight)
 
@@ -277,6 +278,12 @@ func (l *Launcher) Context(ctx context.Context) *Launcher {
 	return l
 }
 
+// LaunchTimeout sets the timeout for getting the debug url when launching the browser.
+func (l *Launcher) LaunchTimeout(timeout time.Duration) *Launcher {
+	l.launchTimeout = timeout
+	return l
+}
+
 // Set a command line argument when launching the browser.
 // Be careful the first argument is a flag name, it shouldn't contain values. The values the will be joined with comma.
 // A flag can have multiple values. If no values are provided the flag will be a boolean flag.
@@ -359,12 +366,6 @@ func (l *Launcher) XVFB(v bool) *Launcher {
 // Bin overrides the chrome binary path.
 func (l *Launcher) Bin(cpath string) *Launcher {
 	l.browser.SetChromiumBinary(cpath)
-	return l
-}
-
-// LaunchTimeout sets the timeout for launching the browser and getting the debug url.
-func (l *Launcher) LaunchTimeout(timeout time.Duration) *Launcher {
-	l.launchTimeout = timeout
 	return l
 }
 

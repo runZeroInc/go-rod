@@ -309,6 +309,7 @@ type Browser struct {
 	GID                 int
 	NoSandbox           bool
 	HideWindow          bool
+	LaunchTimeout       time.Duration
 
 	workingDir        string
 	installedRevision int
@@ -506,6 +507,12 @@ func WithHideWindow(v bool) BrowserOption {
 	}
 }
 
+func WithLaunchTimeout(timeout time.Duration) BrowserOption {
+	return func(b *Browser) {
+		b.LaunchTimeout = timeout
+	}
+}
+
 // NewBrowser defines a Browser with user-provided options.
 func NewBrowser(options ...BrowserOption) (*Browser, error) {
 	b := &Browser{
@@ -515,6 +522,7 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 		WithExecFlags:       map[string]string{},
 		WithEnv:             map[string]string{},
 		TempDir:             "",
+		LaunchTimeout:       DefaultLaunchTimeout,
 		workingDir:          ".",
 	}
 
