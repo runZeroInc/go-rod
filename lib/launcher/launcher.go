@@ -662,9 +662,10 @@ func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 		s := bufio.NewScanner(r)
 		for s.Scan() {
 			line := strings.TrimSpace(s.Text())
-			if line != "" {
-				l.logger.Debugf("chrome-debug-%s: %s", n, line)
+			if line == "" {
+				continue
 			}
+			l.logger.Debugf("chrome-%s: %s", n, line)
 		}
 	}
 
