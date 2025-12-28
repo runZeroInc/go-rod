@@ -78,7 +78,7 @@ func TestGetURLErr(t *testing.T) {
 func TestURLParserErr(t *testing.T) {
 	g := setup(t)
 
-	u := &URLParser{
+	u := &ChromiumOutputParser{
 		Buffer: "error",
 		lock:   &sync.Mutex{},
 	}

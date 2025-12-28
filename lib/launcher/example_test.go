@@ -39,7 +39,7 @@ func Example_custom_launch() {
 	}
 
 	cmd := exec.Command(path, args...) //nolint:gosec
-	parser := launcher.NewURLParser()
+	parser := launcher.NewChromiumOutputParser()
 	cmd.Stderr = parser
 	utils.E(cmd.Start())
 	u := launcher.MustResolveURL(<-parser.URL)

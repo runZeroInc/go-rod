@@ -14,10 +14,10 @@ import (
 	"github.com/runZeroInc/go-rod/pkg/gson"
 )
 
-var _ io.Writer = &URLParser{}
+var _ io.Writer = &ChromiumOutputParser{}
 
-// URLParser to get control url from stderr.
-type URLParser struct {
+// ChromiumOutputParser to get control url from stderr.
+type ChromiumOutputParser struct {
 	URL    chan string
 	Buffer string // buffer for the browser stdout
 
@@ -26,9 +26,9 @@ type URLParser struct {
 	done bool
 }
 
-// NewURLParser instance.
-func NewURLParser() *URLParser {
-	return &URLParser{
+// NewChromiumOutputParser instance.
+func NewChromiumOutputParser() *ChromiumOutputParser {
+	return &ChromiumOutputParser{
 		URL:  make(chan string),
 		lock: &sync.Mutex{},
 		ctx:  context.Background(),
@@ -38,13 +38,13 @@ func NewURLParser() *URLParser {
 var regWS = regexp.MustCompile(`ws://.+/`)
 
 // Context sets the context.
-func (r *URLParser) Context(ctx context.Context) *URLParser {
+func (r *ChromiumOutputParser) Context(ctx context.Context) *ChromiumOutputParser {
 	r.ctx = ctx
 	return r
 }
 
 // Write interface.
-func (r *URLParser) Write(p []byte) (n int, err error) {
+func (r *ChromiumOutputParser) Write(p []byte) (n int, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -70,7 +70,7 @@ func (r *URLParser) Write(p []byte) (n int, err error) {
 }
 
 // Err returns the common error parsed from stdout and stderr.
-func (r *URLParser) Err() error {
+func (r *ChromiumOutputParser) Err() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 

@@ -95,7 +95,7 @@ type Launcher struct {
 	logger *logrus.Logger
 
 	browser *Browser
-	parser  *URLParser
+	parser  *ChromiumOutputParser
 	pid     int
 	exit    chan struct{}
 
@@ -147,7 +147,7 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		Flags:     execFlags,
 		exit:      make(chan struct{}),
 		browser:   browser,
-		parser:    NewURLParser(),
+		parser:    NewChromiumOutputParser(),
 		logger:    conf.Logger,
 	}
 	l = l.WindowSize(conf.WindowWidth, conf.WindowHeight)
@@ -190,7 +190,7 @@ func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 		Flags:     GetExecFlags(b),
 		browser:   b,
 		exit:      make(chan struct{}),
-		parser:    NewURLParser(),
+		parser:    NewChromiumOutputParser(),
 		logger:    b.Logger,
 	}, nil
 }
