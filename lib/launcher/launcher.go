@@ -95,7 +95,7 @@ type Launcher struct {
 	Flags         map[flags.Flag][]string `json:"flags"`
 	ctx           context.Context
 	ctxCancel     func()
-	logger        *logrus.Logger
+	logger        *logrus.Entry
 	browser       *Browser
 	parser        *ChromiumOutputParser
 	pid           int
@@ -111,7 +111,7 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		opt(conf)
 	}
 	if conf.Logger == nil {
-		conf.Logger = logrus.StandardLogger()
+		conf.Logger = logrus.StandardLogger().WithField("component", "launcher")
 	}
 
 	// Create a temporary user data dir for this browser instance
@@ -522,7 +522,7 @@ func (l *Launcher) FormatArgs() ([]string, error) {
 // For example, pipe all browser output to stdout:
 //
 //	launcher.New().Logger(os.Stdout)
-func (l *Launcher) Logger(logger *logrus.Logger) *Launcher {
+func (l *Launcher) Logger(logger *logrus.Entry) *Launcher {
 	l.logger = logger
 	return l
 }

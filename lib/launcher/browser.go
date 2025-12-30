@@ -293,7 +293,7 @@ type Browser struct {
 	Arch                string
 	CacheDir            string
 	TempDir             string
-	Logger              *logrus.Logger
+	Logger              *logrus.Entry
 	HTTPClient          *http.Client
 	Timeout             time.Duration
 	UseSystemChromium   bool
@@ -396,7 +396,7 @@ func WithArch(arch string) BrowserOption {
 	}
 }
 
-func WithLogger(logger *logrus.Logger) BrowserOption {
+func WithLogger(logger *logrus.Entry) BrowserOption {
 	return func(b *Browser) {
 		b.Logger = logger
 	}
@@ -533,7 +533,7 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 
 	// Ensure a logger is specified
 	if b.Logger == nil {
-		b.Logger = logrus.New()
+		b.Logger = logrus.StandardLogger().WithField("component", "browser")
 	}
 
 	// Validate defaults
@@ -544,10 +544,6 @@ func NewBrowser(options ...BrowserOption) (*Browser, error) {
 
 	if b.Arch == "" {
 		b.Arch = runtime.GOARCH
-	}
-
-	if b.Logger == nil {
-		b.Logger = logrus.New()
 	}
 
 	if b.HTTPClient == nil {

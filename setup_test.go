@@ -119,9 +119,11 @@ func setup(t *testing.T) G {
 	tester := testerPool.MustGet(newTester)
 	t.Cleanup(func() { testerPool.Put(tester) })
 
+	logr := logrus.New()
+	logr.Out = tester.Open(true, filepath.Join(LogDir, tester.mc.id, t.Name()+".log"))
+	tester.mc.log = logrus.NewEntry(logr)
 	tester.G = got.New(t)
 	tester.mc.t = t
-	tester.mc.log.SetOutput(tester.Open(true, filepath.Join(LogDir, tester.mc.id, t.Name()+".log")))
 	tester.page.MustNavigate("")
 
 	return *tester
@@ -173,7 +175,7 @@ type MockClient struct {
 	sync.RWMutex
 	id        string
 	t         got.Testable
-	log       *logrus.Logger
+	log       *logrus.Entry
 	principal *cdp.Client
 	call      Call
 	event     <-chan *cdp.Event
@@ -189,11 +191,12 @@ func newMockClient(u string) *MockClient {
 	f, err := os.Create(filepath.Join(LogDir, id, "_.log"))
 	log := logrus.New()
 	log.Out = f
+	ent := log.WithField("component", "mock-client")
 	utils.E(err)
 
 	client := cdp.New().Logger(utils.MultiLogger(defaults.CDP, log)).Start(cdp.MustConnectWS(u))
 
-	return &MockClient{id: id, principal: client, log: log}
+	return &MockClient{id: id, principal: client, log: ent}
 }
 
 func (mc *MockClient) Event() <-chan *cdp.Event {

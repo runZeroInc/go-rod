@@ -63,7 +63,7 @@ func (msg *Message) Load(e proto.Event) bool {
 }
 
 // DefaultLogger for rod.
-var DefaultLogger = logrus.New()
+var DefaultLogger = logrus.StandardLogger().WithField("source", "rod")
 
 // DefaultSleeper generates the default sleeper for retry, it uses backoff to grow the interval.
 // The growth looks like:

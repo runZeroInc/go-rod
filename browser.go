@@ -45,7 +45,7 @@ type Browser struct {
 
 	sleeper func() utils.Sleeper
 
-	logger *logrus.Logger
+	logger *logrus.Entry
 
 	slowMotion time.Duration // see defaults.slow
 	trace      bool          // see defaults.Trace
@@ -134,7 +134,7 @@ func (b *Browser) Monitor(url string) *Browser {
 }
 
 // Logger overrides the default log functions for tracing.
-func (b *Browser) Logger(l *logrus.Logger) *Browser {
+func (b *Browser) Logger(l *logrus.Entry) *Browser {
 	b.logger = l
 	return b
 }
