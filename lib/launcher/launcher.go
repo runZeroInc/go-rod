@@ -93,10 +93,10 @@ var DefaultExecFlags = map[string][]string{
 // Launcher is a helper to launch browser binary smartly.
 type Launcher struct {
 	Flags         map[flags.Flag][]string `json:"flags"`
+	Browser       *Browser
 	ctx           context.Context
 	ctxCancel     func()
 	logger        *logrus.Entry
-	browser       *Browser
 	parser        *ChromiumOutputParser
 	pid           int
 	exit          chan struct{}
@@ -148,7 +148,7 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		ctxCancel:     cancel,
 		Flags:         execFlags,
 		exit:          make(chan struct{}),
-		browser:       browser,
+		Browser:       browser,
 		parser:        NewChromiumOutputParser(),
 		logger:        conf.Logger,
 		launchTimeout: browser.LaunchTimeout,
@@ -191,7 +191,7 @@ func NewUserMode(opts ...BrowserOption) (*Launcher, error) {
 		ctx:       ctx,
 		ctxCancel: cancel,
 		Flags:     GetExecFlags(b),
-		browser:   b,
+		Browser:   b,
 		exit:      make(chan struct{}),
 		parser:    NewChromiumOutputParser(),
 		logger:    b.Logger,
@@ -213,7 +213,7 @@ func NewAppMode(u string) (*Launcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	l.browser.SetEnv("GOOGLE_API_KEY", "no")
+	l.Browser.SetEnv("GOOGLE_API_KEY", "no")
 	l.Set(flags.App, u).
 		Headless(false).
 		Delete("no-startup-window").
@@ -332,7 +332,7 @@ func (l *Launcher) Delete(name flags.Flag) *Launcher {
 
 // Revision of the browser to auto download.
 func (l *Launcher) Revision(rev int) *Launcher {
-	l.browser.latestRevision = rev
+	l.Browser.latestRevision = rev
 	return l
 }
 
@@ -359,24 +359,24 @@ func (l *Launcher) NoSandbox(enable bool) *Launcher {
 
 // XVFB enables to run browser in by XVFB. Useful when you want to run headful mode on linux.
 func (l *Launcher) XVFB(v bool) *Launcher {
-	l.browser.SetXVFB(v)
+	l.Browser.SetXVFB(v)
 	return l
 }
 
 // Bin overrides the chrome binary path.
 func (l *Launcher) Bin(cpath string) *Launcher {
-	l.browser.SetChromiumBinary(cpath)
+	l.Browser.SetChromiumBinary(cpath)
 	return l
 }
 
 // GetBin returns the chrome binary path.
 func (l *Launcher) GetBin() string {
-	return l.browser.chromiumBinary
+	return l.Browser.chromiumBinary
 }
 
 // GetBin returns the chrome binary path.
 func (l *Launcher) GetBinVersion() string {
-	return l.browser.chromiumVersion
+	return l.Browser.chromiumVersion
 }
 
 // Preferences set chromium user preferences, such as set the default search engine or disable the pdf viewer.
@@ -465,7 +465,7 @@ func (l *Launcher) WindowPosition(x, y int) *Launcher {
 
 // WorkingDir to launch the browser process.
 func (l *Launcher) WorkingDir(path string) *Launcher {
-	l.browser.workingDir = path
+	l.Browser.workingDir = path
 	return l
 }
 
@@ -479,7 +479,7 @@ func (l *Launcher) Env(env ...string) *Launcher {
 		if len(bits) == 1 {
 			bits = append(bits, "")
 		}
-		l.browser.SetEnv(bits[0], bits[1])
+		l.Browser.SetEnv(bits[0], bits[1])
 	}
 	return l
 }
@@ -544,9 +544,9 @@ func (l *Launcher) Launch() (string, error) {
 		return "", ErrAlreadyLaunched
 	}
 
-	bin := l.browser.GetChromiumBinary()
+	bin := l.Browser.GetChromiumBinary()
 	if bin == "" {
-		return "", fmt.Errorf("chrome path not resolved: %v", l.browser)
+		return "", fmt.Errorf("chrome path not resolved: %v", l.Browser)
 	}
 
 	l.setupUserPreferences()
@@ -565,9 +565,9 @@ func (l *Launcher) Launch() (string, error) {
 	}
 
 	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
-	l.setupCmd(l.ctx, cmd, l.browser.UID, l.browser.GID)
+	l.setupCmd(l.ctx, cmd, l.Browser.UID, l.Browser.GID)
 
-	if err := ensureUserPermissions(l.browser.UID, l.browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
+	if err := ensureUserPermissions(l.Browser.UID, l.Browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
 		l.logger.Errorf("failed to ensure user permissions: %v", err)
 	}
 
@@ -642,10 +642,10 @@ func (l *Launcher) setupUserPreferences() {
 
 func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 	l.osSetupCmd(ctx, cmd, uid, gid)
-	cmd.Dir = l.browser.workingDir
+	cmd.Dir = l.Browser.workingDir
 
-	if l.browser.WithEnv != nil {
-		cmd.Env = envMapToSlice(l.browser.WithEnv)
+	if l.Browser.WithEnv != nil {
+		cmd.Env = envMapToSlice(l.Browser.WithEnv)
 	} else {
 		cmd.Env = os.Environ()
 	}

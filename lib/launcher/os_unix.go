@@ -14,7 +14,7 @@ func killGroup(pid int) {
 }
 
 func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
-	if l.browser.GetXVFB() {
+	if l.Browser.GetXVFB() {
 		*cmd = *exec.CommandContext(ctx, "xvfb-run", cmd.Args...) //nolint:gosec
 	}
 	cmd.SysProcAttr = getSysProcAttr(uid, gid)
