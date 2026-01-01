@@ -368,7 +368,7 @@ func TestElementTracing(t *testing.T) {
 	g := setup(t)
 
 	g.browser.Trace(true)
-	g.browser.Logger(logrus.New())
+	g.browser.Logger(logrus.New().WithField("source", "test"))
 	defer func() {
 		g.browser.Trace(defaults.Trace)
 		g.browser.Logger(rod.DefaultLogger)

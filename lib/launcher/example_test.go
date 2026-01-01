@@ -18,7 +18,7 @@ func Example_use_system_browser() {
 
 func Example_print_browser_CLI_output() {
 	// Pipe the browser stderr and stdout to os.Stdout .
-	u := launcher.NewMust().Logger(logrus.New()).MustLaunch()
+	u := launcher.NewMust().Logger(logrus.New().WithField("source", "test")).MustLaunch()
 	rod.New().ControlURL(u).MustConnect()
 }
 

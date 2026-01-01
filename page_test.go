@@ -482,7 +482,7 @@ func TestPageWaitRequestIdle(t *testing.T) {
 	}`
 
 	waitReq := ""
-	g.browser.Logger(logrus.New())
+	g.browser.Logger(logrus.New().WithField("source", "test"))
 	defer g.browser.Logger(rod.DefaultLogger)
 
 	g.browser.Trace(true)

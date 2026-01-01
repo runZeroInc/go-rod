@@ -84,7 +84,7 @@ func TestTrace(t *testing.T) {
 func TestTraceLogs(t *testing.T) {
 	g := setup(t)
 
-	g.browser.Logger(logrus.New())
+	g.browser.Logger(logrus.New().WithField("source", "test"))
 	g.browser.Trace(true)
 	defer func() {
 		g.browser.Logger(rod.DefaultLogger)
