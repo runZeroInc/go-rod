@@ -21,7 +21,7 @@ func killGroup(pid int) {
 
 func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 	cmd.SysProcAttr = getSysProcAttr(uid, gid)
-	if l.browser.HideWindow {
+	if l.Browser.HideWindow {
 		cmd.SysProcAttr.HideWindow = true
 	}
 }
