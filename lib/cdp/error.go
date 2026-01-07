@@ -1,6 +1,7 @@
 package cdp
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -18,7 +19,8 @@ func (e *Error) Error() string {
 
 // Is stdlib interface.
 func (e *Error) Is(target error) bool {
-	err, ok := target.(*Error)
+	var err *Error
+	ok := errors.As(target, &err)
 	return ok && e == err
 }
 
