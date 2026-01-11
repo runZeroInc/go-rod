@@ -575,9 +575,6 @@ func (l *Launcher) Launch() (string, error) {
 		l.logger.Errorf("failed to ensure user permissions: %v", err)
 	}
 
-	// Force a wait delay
-	cmd.WaitDelay = time.Second * 1
-
 	err = cmd.Start()
 	if err != nil {
 		return "", err
@@ -696,7 +693,7 @@ func (l *Launcher) getURL() (u string, err error) {
 		l.launchErrLock.Lock()
 		storedErr := l.launchErr
 		l.launchErrLock.Unlock()
-		
+
 		if storedErr != nil {
 			err = storedErr
 		} else {
