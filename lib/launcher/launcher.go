@@ -565,22 +565,37 @@ func (l *Launcher) Launch() (string, error) {
 	}
 
 	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
+
+	l.logger.Errorf("[XXXXXXXx] cmd context is %#v for cmd %#v...", l.ctx, cmd)
+
 	l.setupCmd(l.ctx, cmd, l.Browser.UID, l.Browser.GID)
+
+	l.logger.Errorf("[XXXXXXXx] cmd setup is %#v for cmd %#v...", l.ctx, cmd)
 
 	if err := ensureUserPermissions(l.Browser.UID, l.Browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
 		l.logger.Errorf("failed to ensure user permissions: %v", err)
 	}
 
+	l.logger.Errorf("[XXXXXXXx] starting cmd %#v %#v...", l.ctx, cmd)
+
+	// Force a wait delay
+	cmd.WaitDelay = time.Second * 1
+
 	err = cmd.Start()
 	if err != nil {
+		l.logger.Errorf("[XXXXXXXXXX] start failed %#v: %v", cmd, err)
 		return "", err
 	}
+	l.logger.Errorf("[XXXXXXXXXX] start succeeded %#v -> %#v", cmd, cmd.Process)
 
 	l.pid = cmd.Process.Pid
 
 	go func() {
-		_ = cmd.Wait()
+		l.logger.Errorf("[XXXXXXXx] waiting for command to finish...")
+		err := cmd.Wait()
+		l.logger.Errorf("[XXXXXXXXXX] command finished with err: %v", err)
 		l.ctxCancel()
+		l.logger.Errorf("[XXXXXXXXXX] canceling and killing...")
 		close(l.exit)
 		killLeftoverProcesses(l.pid, bin)
 	}()
@@ -595,14 +610,20 @@ func (l *Launcher) Launch() (string, error) {
 	go func() {
 		select {
 		case <-t.C:
+			l.logger.Errorf("[XXXXXXXx] timer hit for launch timeout")
 			l.ctxCancel()
 		case <-l.exit:
+			l.logger.Errorf("[XXXXXXXx] exit hit for launch timeout")
 		}
 	}()
 
 	// Wait for the Devtools debug URL
 	u, err = l.getURL()
+
+	l.logger.Errorf("[XXXXXXXx] stopping timer")
 	t.Stop()
+
+	l.logger.Errorf("[XXXXXXXx] getURL got error: %v", err)
 
 	if err != nil {
 		killLeftoverProcesses(l.pid, bin)
