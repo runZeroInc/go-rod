@@ -166,18 +166,12 @@ func (b *Browser) Connect() error {
 		if u == "" {
 			var err error
 			l, err := launcher.New(b.launchOptions...)
-			b.logger.Errorf("[XXXXXXXXXXXX] launching chromium with options: %#v", b.launchOptions)
-
 			if err != nil {
-				b.logger.Errorf("[XXXXXXXXXXXX] error launching chromium with options: %#v: %v", b.launchOptions, err)
 				return err
 			}
 			b.launcher = l
-			b.logger.Errorf("[XXXXXXXXXXXX]launching chromium with context %#v", b.ctx)
-
 			u, err = l.Context(b.ctx).Launch()
 			if err != nil {
-				b.logger.Errorf("[XXXXXXXXXXXX] error launching chromium with context %#v: %v", b.ctx, err)
 				return err
 			}
 		}
