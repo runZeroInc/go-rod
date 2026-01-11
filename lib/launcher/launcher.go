@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -101,7 +102,9 @@ type Launcher struct {
 	pid           int
 	exit          chan struct{}
 	launchTimeout time.Duration
-	isLaunched    int32 // zero means not launched
+	isLaunched    int32  // zero means not launched
+	launchErr     error  // stores the real error from browser process
+	launchErrLock sync.Mutex
 }
 
 // New returns a launcher instance with the configured options.
@@ -594,6 +597,11 @@ func (l *Launcher) Launch() (string, error) {
 		l.logger.Errorf("[XXXXXXXx] waiting for command to finish...")
 		err := cmd.Wait()
 		l.logger.Errorf("[XXXXXXXXXX] command finished with err: %v", err)
+		if err != nil {
+			l.launchErrLock.Lock()
+			l.launchErr = err
+			l.launchErrLock.Unlock()
+		}
 		l.ctxCancel()
 		l.logger.Errorf("[XXXXXXXXXX] canceling and killing...")
 		close(l.exit)
@@ -700,7 +708,16 @@ func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
 func (l *Launcher) getURL() (u string, err error) {
 	select {
 	case <-l.ctx.Done():
-		err = l.ctx.Err()
+		// If we have a stored launch error (from cmd.Wait()), return that instead of context.Err()
+		l.launchErrLock.Lock()
+		storedErr := l.launchErr
+		l.launchErrLock.Unlock()
+		
+		if storedErr != nil {
+			err = storedErr
+		} else {
+			err = l.ctx.Err()
+		}
 	case u = <-l.parser.URL:
 	case <-l.exit:
 		err = l.parser.Err()
