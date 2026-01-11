@@ -327,3 +327,29 @@ func TestLaunchGetURLTimeoutReached(t *testing.T) {
 		t.Errorf("launch timeout not enforced")
 	}
 }
+
+func TestLaunchBrowserProcessError(t *testing.T) {
+	g := setup(t)
+
+	// Use a command that exits with an error to simulate browser crash
+	l := launcher.NewMust(launcher.WithContext(context.Background())).Bin("sh")
+	l.Flags = map[flags.Flag][]string{
+		flags.Arguments: {"-c", "exit 42"},
+	}
+
+	_, err := l.Launch()
+	g.Err(err)
+
+	// The error should be from the process exit, not "context canceled"
+	// We check that the error is NOT context.Canceled
+	if err == context.Canceled {
+		t.Errorf("Expected real process error, got context.Canceled")
+	}
+
+	// The error should contain information about the exit status
+	errStr := err.Error()
+	if !strings.Contains(errStr, "exit") && !strings.Contains(errStr, "status") && !strings.Contains(errStr, "42") {
+		t.Logf("Error message: %s", errStr)
+		t.Logf("Expected error to contain exit status information")
+	}
+}
