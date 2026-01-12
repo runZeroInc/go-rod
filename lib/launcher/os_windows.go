@@ -45,7 +45,7 @@ func (l *Launcher) osResolveAttributes() {
 		l.osAttributes.SID = sid
 	}
 
-	// Exit early if we are not running as LocalSystem
+	// Log a warning if the current user is not SYSTEM
 	if strings.EqualFold(l.osAttributes.Username, "NT AUTHORITY\\SYSTEM") == false {
 		l.logger.Debugf("sudo unlikely to work, not system (%s\\%s)", dom, user)
 	}
@@ -113,15 +113,11 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 	if err := ChownByUsername(l.Browser.TempDir, l.osAttributes.Username); err != nil {
 		l.logger.Errorf("chown temp dir %s for user %s failed: %v", l.Browser.TempDir, l.osAttributes.Username, err)
 		errSet = err
-	} else {
-		l.logger.Debugf("chowned temp %s for user %s", l.Browser.TempDir, l.osAttributes.Username)
 	}
 
 	if err := ChownByUsername(userDir, l.osAttributes.Username); err != nil {
 		l.logger.Errorf("chown user dir %s for user %s failed: %v", userDir, l.osAttributes.Username, err)
 		errSet = errors.Join(errSet, err)
-	} else {
-		l.logger.Debugf("chowned userdata-dir %s for user %s", userDir, l.osAttributes.Username)
 	}
 
 	// Preemptively create the crashpad directory structure required by Edge
@@ -131,13 +127,12 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 	for _, part := range crashPadParts {
 		bpath = filepath.Join(bpath, part)
 		if err := os.MkdirAll(bpath, 0o755); err != nil { //nolint:gosec
-			l.logger.Errorf("cmkdir %s for user %s failed: %v", bpath, l.osAttributes.Username, err)
+			l.logger.Errorf("mkdir %s for user %s failed: %v", bpath, l.osAttributes.Username, err)
 		}
 		if err := ChownByUsername(bpath, l.osAttributes.Username); err != nil {
 			l.logger.Errorf("chown %s for user %s failed: %v", bpath, l.osAttributes.Username, err)
 			errSet = errors.Join(errSet, err)
 		}
-		l.logger.Debugf("created crashpad dir %s for user %s", bpath, l.osAttributes.Username)
 	}
 	return errSet
 }
@@ -173,16 +168,6 @@ func ChownByUsername(path string, username string) error {
 		winacl.GrantName(windows.GENERIC_ALL, username),
 		winacl.GrantName(windows.MAXIMUM_ALLOWED, username),
 	)
-}
-
-func getTokenUser(token windows.Token) (string, error) {
-	tokenUser, err := token.GetTokenUser()
-	if err != nil {
-		return "", fmt.Errorf("GetTokenUser failed: %v", err)
-	}
-	sid := tokenUser.User.Sid.String()
-
-	return sid, nil
 }
 
 func getCurrentProcessTokenUser() (string, string, *windows.SID, error) {
