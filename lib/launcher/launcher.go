@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +43,7 @@ var DefaultExecFlags = map[string][]string{
 		"site-per-process", // See https://github.com/puppeteer/puppeteer/issues/2548
 		"TranslateUI",
 		"OptimizationGuideModelDownloading", "OptimizationHintsFetching", "OptimizationTargetPrediction", "OptimizationHints",
+		// "NetworkService", "NetworkServiceInProcess",
 	},
 
 	"allow-chrome-scheme-url":                            nil, // Allow chrome:// URLs in headless mode
@@ -102,6 +102,7 @@ type Launcher struct {
 	exit          chan struct{}
 	launchTimeout time.Duration
 	isLaunched    int32 // zero means not launched
+	osAttributes  *osAttributes
 }
 
 // New returns a launcher instance with the configured options.
@@ -120,8 +121,24 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		return nil, fmt.Errorf("mktemp user data dir %s: %w", profileDir, err)
 	}
 
+	// Set the userdata-dir flag and the corresponding env variable
 	execFlags := GetExecFlags(conf)
 	execFlags[flags.UserDataDir] = []string{profileDir}
+
+	// If a custom environment is set, override the user data dir related variables
+	if conf.WithEnv != nil {
+		conf.WithEnv["CHROME_USER_DATA_DIR"] = profileDir
+		conf.WithEnv["TMP"] = profileDir
+		conf.WithEnv["TEMP"] = profileDir
+		conf.WithEnv["TMPDIR"] = profileDir
+
+		// Override APPDATA and LOCALAPPDATA to avoid polluting real user profile
+		// This is mainly to work around Microsoft Edge behavior on Windows
+		if runtime.GOOS == "windows" {
+			conf.WithEnv["APPDATA"] = profileDir
+			conf.WithEnv["LOCALAPPDATA"] = profileDir
+		}
+	}
 
 	// Configure the top-level context
 	var srcContext context.Context
@@ -154,6 +171,7 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		launchTimeout: browser.LaunchTimeout,
 	}
 	l = l.WindowSize(conf.WindowWidth, conf.WindowHeight)
+	l.osResolveAttributes()
 
 	return l, nil
 }
@@ -565,38 +583,31 @@ func (l *Launcher) Launch() (string, error) {
 	}
 
 	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
-
-	l.logger.Errorf("[XXXXXXXx] cmd context is %#v for cmd %#v...", l.ctx, cmd)
-
 	l.setupCmd(l.ctx, cmd, l.Browser.UID, l.Browser.GID)
 
-	l.logger.Errorf("[XXXXXXXx] cmd setup is %#v for cmd %#v...", l.ctx, cmd)
-
-	if err := ensureUserPermissions(l.Browser.UID, l.Browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
+	if err := l.ensureUserPermissions(l.Browser.UID, l.Browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
 		l.logger.Errorf("failed to ensure user permissions: %v", err)
 	}
-
-	l.logger.Errorf("[XXXXXXXx] starting cmd %#v %#v...", l.ctx, cmd)
 
 	// Force a wait delay
 	cmd.WaitDelay = time.Second * 1
 
 	err = cmd.Start()
 	if err != nil {
-		l.logger.Errorf("[XXXXXXXXXX] start failed %#v: %v", cmd, err)
 		return "", err
 	}
-	l.logger.Errorf("[XXXXXXXXXX] start succeeded %#v -> %#v", cmd, cmd.Process)
 
 	l.pid = cmd.Process.Pid
 
+	exitCodeCh := make(chan error, 1)
 	go func() {
-		l.logger.Errorf("[XXXXXXXx] waiting for command to finish...")
 		err := cmd.Wait()
-		l.logger.Errorf("[XXXXXXXXXX] command finished with err: %v", err)
+		if err != nil {
+			exitCodeCh <- err
+		}
 		l.ctxCancel()
-		l.logger.Errorf("[XXXXXXXXXX] canceling and killing...")
 		close(l.exit)
+		close(exitCodeCh)
 		killLeftoverProcesses(l.pid, bin)
 	}()
 
@@ -606,31 +617,42 @@ func (l *Launcher) Launch() (string, error) {
 	}
 	t := time.NewTimer(lt)
 
-	// Prevent a stall if the Chrome process doesn't launch correctly
-	go func() {
-		select {
-		case <-t.C:
-			l.logger.Errorf("[XXXXXXXx] timer hit for launch timeout")
-			l.ctxCancel()
-		case <-l.exit:
-			l.logger.Errorf("[XXXXXXXx] exit hit for launch timeout")
-		}
-	}()
+	var gotURL string
+	var exitErr error
 
-	// Wait for the Devtools debug URL
-	u, err = l.getURL()
+	// This select replaces l.GetURL() to add a launch timeout and track exit codes
+	select {
+	case u := <-l.parser.URL:
+		// This is the successful path: a valid CDP URL
+		gotURL = u
+	case <-l.ctx.Done():
+		// The context timeout or cancelation was reached
+	case exitErr = <-exitCodeCh:
+		// The cmd.Wait() returned an error, record it here
+		l.logger.Debugf("process exited with error: %v", exitErr)
+	case <-l.exit:
+		// The process exited without us getting a URL
+		l.logger.Debugf("process exited")
+	case <-t.C:
+		// The launch timeout was reached first
+		l.logger.Debugf("launch timeout reached")
+		l.ctxCancel()
+	}
 
-	l.logger.Errorf("[XXXXXXXx] stopping timer")
-	t.Stop()
-
-	l.logger.Errorf("[XXXXXXXx] getURL got error: %v", err)
+	// Prefer the exitErr over the context error for better diagnostics
+	if exitErr != nil {
+		err = exitErr
+	}
 
 	if err != nil {
 		killLeftoverProcesses(l.pid, bin)
 		l.ctxCancel()
+		t.Stop()
 		return "", err
 	}
-	return ResolveURL(u)
+
+	t.Stop()
+	return ResolveURL(gotURL)
 }
 
 func (l *Launcher) hasLaunched() bool {
@@ -738,85 +760,4 @@ func (l *Launcher) Cleanup() {
 	l.Kill()
 	dir := l.Get(flags.UserDataDir)
 	_ = os.RemoveAll(dir)
-}
-
-func ensureUserPermissions(uid, gid int, userDir, binPath string) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	if os.Geteuid() != 0 {
-		return nil
-	}
-	if uid == 0 {
-		return nil
-	}
-	var res error
-
-	if err := ensureUserPermissionsUserDir(uid, gid, userDir); err != nil {
-		res = errors.Join(res, fmt.Errorf("user dir permissions: %w", err))
-	}
-	if err := ensureUserPermissionsBinary(uid, gid, binPath); err != nil {
-		res = errors.Join(res, fmt.Errorf("binary permissions: %w", err))
-	}
-	return res
-}
-
-func ensureUserPermissionsUserDir(uid, gid int, userDir string) error {
-	// Validate user dir
-	if userDir == "" {
-		return fmt.Errorf("no user-data-dir")
-	}
-	st, err := os.Stat(userDir)
-	if err != nil {
-		return fmt.Errorf("userdir %s: %w", userDir, err)
-	}
-	if !st.IsDir() {
-		return fmt.Errorf("userdir %s is not a directory", userDir)
-	}
-
-	err = filepath.Walk(userDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if path == userDir {
-			// Ensure that the user directory is owned by the user
-			if err := os.Chown(path, uid, gid); err != nil {
-				return fmt.Errorf("chown path %s: %w", path, err)
-			}
-			return nil
-		}
-		// Try to ensure all leading paths are 755
-		_ = os.Chmod(path, 0o755) //nolint:gosec
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("userdir path %s: %w", userDir, err)
-	}
-	return nil
-}
-
-func ensureUserPermissionsBinary(uid, gid int, binPath string) error {
-	// Validate bin path
-	if binPath == "" {
-		return fmt.Errorf("no binary path")
-	}
-	st, err := os.Stat(binPath)
-	if err != nil {
-		return fmt.Errorf("bin path %s: %w", binPath, err)
-	}
-	if st.IsDir() {
-		return fmt.Errorf("bin path %s is a directory", binPath)
-	}
-
-	err = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		_ = os.Chmod(path, 0o755) //nolint:gosec
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("bin path %s: %w", binPath, err)
-	}
-	return nil
 }
