@@ -55,6 +55,9 @@ func (l *Launcher) osResolveAttributes() {
 		if !found {
 			continue
 		}
+		// Note that Microsoft Edge will still timeout if this code is run as system and gets a valid token
+		// when it is NOT running as a service. It will still obtain the token, but Edge will not start
+		// properly when launched this way.
 		token, err := api.LogonUser(user, dom, "", api.LOGON32_LOGON_SERVICE, api.LOGON32_PROVIDER_DEFAULT)
 		if err == nil {
 			l.osAttributes.Username = v
