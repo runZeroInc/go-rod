@@ -583,9 +583,9 @@ func (l *Launcher) Launch() (string, error) {
 	}
 
 	cmd = exec.CommandContext(l.ctx, bin, args...) //nolint:gosec
-	l.setupCmd(l.ctx, cmd, l.Browser.UID, l.Browser.GID)
+	l.setupCmd(l.ctx, cmd)
 
-	if err := l.ensureUserPermissions(l.Browser.UID, l.Browser.GID, l.Get(flags.UserDataDir), l.GetBin()); err != nil {
+	if err := l.ensureUserPermissions(l.Get(flags.UserDataDir), l.GetBin()); err != nil {
 		l.logger.Errorf("failed to ensure user permissions: %v", err)
 	}
 
@@ -683,8 +683,8 @@ func (l *Launcher) setupUserPreferences() {
 	}
 }
 
-func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) {
-	l.osSetupCmd(ctx, cmd, uid, gid)
+func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd) {
+	l.osSetupCmd(ctx, cmd)
 	cmd.Dir = l.Browser.workingDir
 
 	if l.Browser.WithEnv != nil {

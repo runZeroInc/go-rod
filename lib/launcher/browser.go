@@ -753,6 +753,10 @@ func (b *Browser) DownloadAndInstall() error {
 	}
 	b.Logger.Debugf("upgraded from revision %d to %d", b.installedRevision, b.latestRevision)
 	b.installedRevision = b.latestRevision
+
+	if err := osEnsureApplicationPermissions(b.CacheDir); err != nil {
+		b.Logger.Errorf("failed to set file permissions: %v", err)
+	}
 	return nil
 }
 

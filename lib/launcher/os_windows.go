@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,8 +21,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var advapi32 = windows.MustLoadDLL("advapi32.dll")
-
 type osAttributes struct {
 	Username string
 	Token    windows.Token
@@ -34,6 +33,17 @@ var osPreferredUsernames = []string{
 	"NT AUTHORITY\\NetworkService",
 	"NT AUTHORITY\\LocalService",
 }
+
+// Grant Read/Execute to S-1-15-2-2 (All Restricted Application Packages) to support LPAC
+// - https://source.chromium.org/chromium/chromium/src/+/main:testing/scripts/common.py;l=62
+// - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/design/sandbox.md#lpac-file-system-permissions
+// - https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+var (
+	RestrictedAppPackagesSID, _   = windows.StringToSid("S-1-15-2-2")
+	RestrictedAppPackagesUsername = "APPLICATION PACKAGE AUTHORITY\\ALL RESTRICTED APPLICATION PACKAGES"
+	AllAppPackagesSID, _          = windows.StringToSid("S-1-15-2-1")
+	AllAppPackagesUsername        = "APPLICATION PACKAGE AUTHORITY\\ALL APPLICATION PACKAGES"
+)
 
 func (l *Launcher) osResolveAttributes() {
 	l.osAttributes = &osAttributes{}
@@ -50,7 +60,6 @@ func (l *Launcher) osResolveAttributes() {
 		l.logger.Debugf("not running as system, skipping sudo (%s\\%s)", dom, user)
 		return
 	}
-	// TODO: Skip sudo if we are not running as a service, since the token will not work properly.
 
 	for _, v := range osPreferredUsernames {
 		dom, user, found := strings.Cut(v, "\\")
@@ -78,30 +87,31 @@ func (l *Launcher) osResolveAttributes() {
 	}
 }
 
-func (l *Launcher) ensureUserPermissions(uid, gid int, userDir, binPath string) error {
+func (l *Launcher) ensureUserPermissions(userDir, binPath string) error {
 	if l.osAttributes.Username == "" {
 		return nil
 	}
 	var res error
-	if err := l.osEnsureUserPermissionsUserDir(uid, gid, userDir); err != nil {
+	if err := l.osEnsureUserPermissionsUserDir(userDir); err != nil {
 		res = errors.Join(res, fmt.Errorf("user dir permissions: %w", err))
 	}
-	if err := l.osEnsureUserPermissionsBinary(uid, gid, binPath); err != nil {
+	if err := l.osEnsureUserPermissionsBinary(binPath); err != nil {
 		res = errors.Join(res, fmt.Errorf("binary permissions: %w", err))
 	}
 	return res
 }
 
-func (l *Launcher) osEnsureUserPermissionsBinary(uid, gid int, binPath string) error {
+func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 	if binPath == "" {
 		return fmt.Errorf("no binary path")
 	}
 	// Set read/exec permissions on the binary path
 	_ = winacl.Chmod(binPath, 0o755)
+	winacl.Apply(binPath, false, true, api.ExplicitAccess{})
 	return nil
 }
 
-func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) error {
+func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 	if userDir == "" {
 		return fmt.Errorf("no user-data-dir")
 	}
@@ -146,6 +156,17 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 	return errSet
 }
 
+// osEnsureApplicationPermissions enables read/execute permissions for everyone, with an explicit grant
+// for All Application Packages and All Restricted Application Packages to support LPAC.
+func osEnsureApplicationPermissions(dir string) error {
+	// Ignore errors setting permissions on individual files/directories
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		_ = GrantReadExecToPackages(path)
+		return nil
+	})
+	return nil
+}
+
 // Do not inherit the parent error handling mode for the subprocess
 const CREATE_DEFAULT_ERROR_MODE = 0x04000000
 
@@ -153,9 +174,9 @@ func killGroup(pid int) {
 	terminateProcess(pid)
 }
 
-func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) error {
+func (l *Launcher) osSetupCmd(_ context.Context, cmd *exec.Cmd) error {
 	var err error
-	cmd.SysProcAttr = l.getSysProcAttr(uid, gid)
+	cmd.SysProcAttr = l.getSysProcAttr()
 	if l.Browser.HideWindow {
 		cmd.SysProcAttr.HideWindow = true
 	}
@@ -176,6 +197,16 @@ func ChownByUsername(path string, username string) error {
 	return winacl.Apply(path, false, true,
 		winacl.GrantName(windows.GENERIC_ALL, username),
 		winacl.GrantName(windows.MAXIMUM_ALLOWED, username),
+	)
+}
+
+func GrantReadExecToPackages(path string) error {
+	_ = winacl.Chmod(path, 0o755)
+	return winacl.Apply(path, false, true,
+		winacl.GrantName(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, AllAppPackagesUsername),
+		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, AllAppPackagesSID),
+		winacl.GrantName(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, RestrictedAppPackagesUsername),
+		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, RestrictedAppPackagesSID),
 	)
 }
 
@@ -202,7 +233,7 @@ func getCurrentProcessTokenUser() (string, string, *windows.SID, error) {
 	return account, domain, tokenUser.User.Sid, err
 }
 
-func (l *Launcher) getSysProcAttr(uid, gid int) *syscall.SysProcAttr {
+func (l *Launcher) getSysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | CREATE_DEFAULT_ERROR_MODE,
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,12 +24,12 @@ func (l *Launcher) osResolveAttributes() {
 	l.osAttributes.GID = l.Browser.GID
 }
 
-func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd, uid, gid int) error {
+func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd) error {
 	var err error
 	if l.Browser.GetXVFB() {
 		*cmd = *exec.CommandContext(ctx, "xvfb-run", cmd.Args...) //nolint:gosec
 	}
-	cmd.SysProcAttr, err = l.getSysProcAttr(uid, gid)
+	cmd.SysProcAttr, err = l.getSysProcAttr(l.Browser.UID, l.Browser.GID)
 	return err
 }
 
@@ -48,25 +49,25 @@ func (l *Launcher) getSysProcAttr(uid, gid int) (*syscall.SysProcAttr, error) {
 	return v, nil
 }
 
-func (l *Launcher) ensureUserPermissions(uid, gid int, userDir, binPath string) error {
+func (l *Launcher) ensureUserPermissions(userDir, binPath string) error {
 	if os.Geteuid() != 0 {
 		return nil
 	}
-	if uid == 0 {
+	if l.Browser.UID == 0 {
 		return nil
 	}
 	var res error
 
-	if err := l.osEnsureUserPermissionsUserDir(uid, gid, userDir); err != nil {
+	if err := l.osEnsureUserPermissionsUserDir(userDir); err != nil {
 		res = errors.Join(res, fmt.Errorf("user dir permissions: %w", err))
 	}
-	if err := l.osEnsureUserPermissionsBinary(uid, gid, binPath); err != nil {
+	if err := l.osEnsureUserPermissionsBinary(binPath); err != nil {
 		res = errors.Join(res, fmt.Errorf("binary permissions: %w", err))
 	}
 	return res
 }
 
-func (l *Launcher) osEnsureUserPermissionsBinary(uid, gid int, binPath string) error {
+func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 	// Validate bin path
 	if binPath == "" {
 		return fmt.Errorf("no binary path")
@@ -92,7 +93,7 @@ func (l *Launcher) osEnsureUserPermissionsBinary(uid, gid int, binPath string) e
 	return nil
 }
 
-func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) error {
+func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 	// Validate user dir
 	if userDir == "" {
 		return fmt.Errorf("no user-data-dir")
@@ -111,7 +112,7 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 		}
 		if path == userDir {
 			// Ensure that the user directory is owned by the user
-			if err := os.Chown(path, uid, gid); err != nil {
+			if err := os.Chown(path, l.Browser.UID, l.Browser.GID); err != nil {
 				return fmt.Errorf("chown path %s: %w", path, err)
 			}
 			return nil
@@ -126,11 +127,20 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 	return nil
 }
 
+// osEnsureApplicationPermissions enables read/execute permissions for everyone.
+func osEnsureApplicationPermissions(dir string) error {
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		_ = os.Chmod(path, 0o755) //nolint:gosec
+		return nil
+	})
+	return nil
+}
+
 func killGroup(pid int) {
 	_ = syscall.Kill(-pid, syscall.SIGKILL)
 }
 
-func killLeftoverProcesses(pid int, bpath string) {
+func killLeftoverProcesses(pid int, _ string) {
 	syscall.Kill(-pid, syscall.SIGKILL)
 	syscall.Wait4(-1, nil, syscall.WNOHANG, nil)
 }
