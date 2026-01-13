@@ -93,11 +93,15 @@ func (l *Launcher) ensureUserPermissions(uid, gid int, userDir, binPath string) 
 }
 
 func (l *Launcher) osEnsureUserPermissionsBinary(uid, gid int, binPath string) error {
+	if binPath == "" {
+		return fmt.Errorf("no binary path")
+	}
+	// Set read/exec permissions on the binary path
+	_ = winacl.Chmod(binPath, 0o755)
 	return nil
 }
 
 func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) error {
-	// Validate user dir
 	if userDir == "" {
 		return fmt.Errorf("no user-data-dir")
 	}
