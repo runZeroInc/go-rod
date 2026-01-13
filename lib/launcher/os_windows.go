@@ -45,10 +45,12 @@ func (l *Launcher) osResolveAttributes() {
 		l.osAttributes.SID = sid
 	}
 
-	// Log a warning if the current user is not SYSTEM
+	// Return early if the current user is not SYSTEM
 	if strings.EqualFold(l.osAttributes.Username, "NT AUTHORITY\\SYSTEM") == false {
-		l.logger.Debugf("sudo unlikely to work, not system (%s\\%s)", dom, user)
+		l.logger.Debugf("not running as system, skipping sudo (%s\\%s)", dom, user)
+		return
 	}
+	// TODO: Skip sudo if we are not running as a service, since the token will not work properly.
 
 	for _, v := range osPreferredUsernames {
 		dom, user, found := strings.Cut(v, "\\")
@@ -77,7 +79,7 @@ func (l *Launcher) osResolveAttributes() {
 }
 
 func (l *Launcher) ensureUserPermissions(uid, gid int, userDir, binPath string) error {
-	if l.osAttributes.Token == 0 {
+	if l.osAttributes.Username == "" {
 		return nil
 	}
 	var res error
@@ -100,7 +102,7 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(uid, gid int, userDir string) 
 		return fmt.Errorf("no user-data-dir")
 	}
 
-	if l.osAttributes.Token == 0 {
+	if l.osAttributes.Username == "" {
 		return nil
 	}
 
