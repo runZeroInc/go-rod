@@ -652,6 +652,11 @@ func (l *Launcher) Launch() (string, error) {
 	}
 
 	t.Stop()
+
+	// Return the error from the parser (ex: `Received signal`)
+	if gotURL == "" {
+		return "", l.parser.Err()
+	}
 	return ResolveURL(gotURL)
 }
 

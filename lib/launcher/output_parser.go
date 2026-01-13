@@ -37,7 +37,10 @@ func NewChromiumOutputParser() *ChromiumOutputParser {
 	}
 }
 
-var regWS = regexp.MustCompile(`ws://.+/`)
+var (
+	regWS     = regexp.MustCompile(`ws://.+/`)
+	regSignal = regexp.MustCompile(`^Received signal (.+)`)
+)
 
 // Context sets the context.
 func (r *ChromiumOutputParser) Context(ctx context.Context) *ChromiumOutputParser {
@@ -52,14 +55,22 @@ func (r *ChromiumOutputParser) Write(p []byte) (n int, err error) {
 
 	if !r.done {
 		r.Buffer += string(p)
+
+		// Search for the websocket URL and return it to the channel
 		str := regWS.FindString(r.Buffer)
 		if str != "" {
 			u, err := url.Parse(strings.TrimSpace(str))
-			utils.E(err)
-			select {
-			case <-r.ctx.Done():
-			case r.URL <- "http://" + u.Host:
+			if err == nil {
+				select {
+				case <-r.ctx.Done():
+				case r.URL <- "http://" + u.Host:
+				}
 			}
+			r.done = true
+			r.Buffer = ""
+		}
+		// Immediately stop parsing when we see a `Received signal` result
+		if str := regSignal.FindString(r.Buffer); str != "" {
 			r.done = true
 			r.Buffer = ""
 		}
@@ -140,12 +151,16 @@ func ResolveURL(u string) (string, error) {
 	_, _ = io.Copy(io.Discard, res.Body)
 	_ = res.Body.Close()
 
-	utils.E(err)
+	if err != nil {
+		return "", fmt.Errorf("resolve url failed to read response from %s: %w", parsed.String(), err)
+	}
 
 	wsURL := gson.New(data).Get("webSocketDebuggerUrl").Str()
 
 	parsedWS, err := url.Parse(wsURL)
-	utils.E(err)
+	if err != nil {
+		return "", fmt.Errorf("resolve url failed to parse websocket url %s: %w", wsURL, err)
+	}
 
 	parsedWS.Host = parsed.Host
 
