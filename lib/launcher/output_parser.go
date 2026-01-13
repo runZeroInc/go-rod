@@ -21,12 +21,12 @@ var _ io.Writer = &ChromiumOutputParser{}
 // ChromiumOutputParser to get control url from stderr.
 type ChromiumOutputParser struct {
 	URL            chan string
-	SandboxWarning chan string
 	Buffer         string // buffer for the browser stdout
-
-	lock *sync.Mutex
-	ctx  context.Context
-	done bool
+	SignalWarning  string
+	SandboxWarning string
+	lock           *sync.Mutex
+	ctx            context.Context
+	done           bool
 }
 
 // NewChromiumOutputParser instance.
@@ -58,6 +58,14 @@ func (r *ChromiumOutputParser) Write(p []byte) (n int, err error) {
 	if !r.done {
 		r.Buffer += string(p)
 
+		if regSignal.MatchString(r.Buffer) {
+			r.SignalWarning = r.Buffer
+		}
+
+		if regSandbox.MatchString(r.Buffer) {
+			r.SandboxWarning = r.Buffer
+		}
+
 		// Search for the websocket URL and return it to the channel
 		str := regWS.FindString(r.Buffer)
 		if str != "" {
@@ -68,21 +76,6 @@ func (r *ChromiumOutputParser) Write(p []byte) (n int, err error) {
 				case r.URL <- "http://" + u.Host:
 				}
 			}
-			r.done = true
-			r.Buffer = ""
-		}
-
-		// Search for sandbox warnings
-		if str := regSandbox.FindString(r.Buffer); str != "" {
-			select {
-			case <-r.ctx.Done():
-			case r.SandboxWarning <- r.Buffer:
-			}
-			r.Buffer = ""
-		}
-
-		// Search for `Received signal` messages indicating a crash or self-termination
-		if str := regSignal.FindString(r.Buffer); str != "" {
 			r.done = true
 			r.Buffer = ""
 		}

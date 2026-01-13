@@ -628,7 +628,6 @@ func (l *Launcher) Launch() (string, error) {
 	defer t.Stop()
 
 	var gotURL string
-	var gotSandboxWarning string
 	var exitErr error
 
 	// This select replaces l.GetURL() to add a launch timeout and track exit codes
@@ -636,8 +635,6 @@ func (l *Launcher) Launch() (string, error) {
 	case u := <-l.parser.URL:
 		// This is the successful path: a valid CDP URL
 		gotURL = u
-	case u := <-l.parser.SandboxWarning:
-		gotSandboxWarning = u
 	case <-l.ctx.Done():
 		// The context timeout or cancelation was reached
 	case exitErr = <-exitCodeCh:
@@ -662,9 +659,14 @@ func (l *Launcher) Launch() (string, error) {
 		err = l.parser.Err()
 	}
 
+	// Prefer the signal warning over any other error conditionn
+	if l.parser.SignalWarning != "" {
+		err = fmt.Errorf("%w: %s", ErrNoSandbox, l.parser.SignalWarning)
+	}
+
 	// Lastly, prefer the sandbox warning over any other error conditionn
-	if gotSandboxWarning != "" {
-		err = fmt.Errorf("%w: %s", ErrNoSandbox, gotSandboxWarning)
+	if l.parser.SandboxWarning != "" {
+		err = fmt.Errorf("%w: %s", ErrNoSandbox, l.parser.SandboxWarning)
 	}
 
 	// If we have an error, clean up any leftover processes
