@@ -233,18 +233,26 @@ func getCurrentProcessTokenUser() (string, string, *windows.SID, error) {
 	return account, domain, tokenUser.User.Sid, err
 }
 
+// getSysProcAttr returns the SysProcAttr for Windows platforms
+// Specifically, it sets the CreationFlags to create a new process group
+// with default error mode.
 func (l *Launcher) getSysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | CREATE_DEFAULT_ERROR_MODE,
 	}
 }
 
+// setupLimits is a no-op on Windows.
+func (l *Launcher) setupLimits() error {
+	return nil
+}
+
+// terminateProcess terminates a process by its PID on Windows.
 func terminateProcess(pid int) {
 	handle, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, true, uint32(pid))
 	if err != nil {
 		return
 	}
-
 	_ = syscall.TerminateProcess(handle, 0)
 	_ = syscall.CloseHandle(handle)
 }

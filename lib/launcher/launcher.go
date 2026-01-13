@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +25,12 @@ import (
 
 // DefaultLaunchTimeout sets a limit for getting the debug url when launching the browser.
 const DefaultLaunchTimeout = time.Minute * 3
+
+// ErrNoSandbox is returned when sandbox is required but not disabled with `--no-sandbox`.
+// This can happen when running as root instead of a low-privilege user or when running
+// as a normal user on U buntu 23.10+ and other distributions where user namespaces
+// have been disabled and AppArmor profiles must be used instead.
+var ErrNoSandbox = errors.New("sandbox must be disabled")
 
 // DefaultUserDataDirPrefix ...
 var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "go-rod-user-data")
@@ -569,6 +576,8 @@ func (l *Launcher) Launch() (string, error) {
 
 	l.setupUserPreferences()
 
+	l.setupLimits()
+
 	var cmd *exec.Cmd
 
 	args, err := l.FormatArgs()
@@ -616,8 +625,10 @@ func (l *Launcher) Launch() (string, error) {
 		lt = DefaultLaunchTimeout
 	}
 	t := time.NewTimer(lt)
+	defer t.Stop()
 
 	var gotURL string
+	var gotSandboxWarning string
 	var exitErr error
 
 	// This select replaces l.GetURL() to add a launch timeout and track exit codes
@@ -625,6 +636,8 @@ func (l *Launcher) Launch() (string, error) {
 	case u := <-l.parser.URL:
 		// This is the successful path: a valid CDP URL
 		gotURL = u
+	case u := <-l.parser.SandboxWarning:
+		gotSandboxWarning = u
 	case <-l.ctx.Done():
 		// The context timeout or cancelation was reached
 	case exitErr = <-exitCodeCh:
@@ -644,14 +657,22 @@ func (l *Launcher) Launch() (string, error) {
 		err = exitErr
 	}
 
+	// Prefer the parser error we didn't receive a valid URL
+	if gotURL == "" && err == nil && l.parser.Err() != nil {
+		err = l.parser.Err()
+	}
+
+	// Lastly, prefer the sandbox warning over any other error conditionn
+	if gotSandboxWarning != "" {
+		err = fmt.Errorf("%w: %s", ErrNoSandbox, gotSandboxWarning)
+	}
+
+	// If we have an error, clean up any leftover processes
 	if err != nil {
 		killLeftoverProcesses(l.pid, bin)
 		l.ctxCancel()
-		t.Stop()
 		return "", err
 	}
-
-	t.Stop()
 
 	// Return the error from the parser (ex: `Received signal`)
 	if gotURL == "" {
