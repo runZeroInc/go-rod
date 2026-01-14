@@ -51,26 +51,6 @@ func (l *Launcher) getSysProcAttr(uid, gid int) (*syscall.SysProcAttr, error) {
 
 const rlimitNoFiles = 1048576
 
-// setupLimits adjust resource limits for the launcher process on Unix-like systems.
-// Specifically, it increases the file descriptor limit and disables core dumps.
-func (l *Launcher) setupLimits() error {
-	// Increase the file descriptor to prevent "too many open files" errors in
-	// when using many concurrent browser tabs.
-	noFile := &syscall.Rlimit{}
-	_ = syscall.Getrlimit(syscall.RLIMIT_NOFILE, noFile)
-	if noFile.Cur < uint64(rlimitNoFiles) {
-		_ = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Cur: rlimitNoFiles, Max: rlimitNoFiles})
-	}
-
-	// Disable core dumps to prevent sandbox self-termination from filling up disk space.
-	noCore := &syscall.Rlimit{}
-	_ = syscall.Getrlimit(syscall.RLIMIT_CORE, noCore)
-	if noCore.Cur != 0 {
-		_ = syscall.Setrlimit(syscall.RLIMIT_CORE, &syscall.Rlimit{Cur: 0, Max: 0})
-	}
-	return nil
-}
-
 func (l *Launcher) ensureUserPermissions(userDir, binPath string) error {
 	if os.Geteuid() != 0 {
 		return nil
@@ -160,9 +140,4 @@ func osEnsureApplicationPermissions(dir string) error {
 
 func killGroup(pid int) {
 	_ = syscall.Kill(-pid, syscall.SIGKILL)
-}
-
-func killLeftoverProcesses(pid int, _ string) {
-	syscall.Kill(-pid, syscall.SIGKILL)
-	syscall.Wait4(-1, nil, syscall.WNOHANG, nil)
 }
