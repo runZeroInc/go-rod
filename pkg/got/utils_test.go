@@ -97,13 +97,13 @@ func TestHelper(t *testing.T) {
 		ut.Has(ut.Req("", string(rune(0x7f))).Err().Error(), `invalid control character in URL`)
 
 		res := ut.Req("", s.URL("/b"))
-		ut.Eq(res.JSON(), []interface{}{"ok", float64(1)})
+		ut.Eq(res.JSON(), []any{"ok", float64(1)})
 		ut.Has(res.Header.Get("Content-Type"), "application/json")
 
 		res = ut.Req("", s.URL("/b"))
-		var v []interface{}
+		var v []any
 		res.Unmarshal(&v)
-		ut.Eq(v, []interface{}{"ok", 1.0})
+		ut.Eq(v, []any{"ok", 1.0})
 	}
 
 	ut.DoAfter(time.Hour, func() {})
@@ -175,7 +175,7 @@ func TestServe(t *testing.T) {
 		wg.Done()
 	}
 
-	for i := 0; i < count; i++ {
+	for range count {
 		go request()
 	}
 

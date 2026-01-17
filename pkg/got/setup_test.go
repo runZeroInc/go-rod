@@ -50,7 +50,7 @@ func (m *mock) FailNow() {
 	m.recover = false
 }
 
-func (m *mock) Logf(format string, args ...interface{}) {
+func (m *mock) Logf(format string, args ...any) {
 	m.Lock()
 	defer m.Unlock()
 

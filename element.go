@@ -720,12 +720,12 @@ func (el *Element) Remove() error {
 }
 
 // Call implements the [proto.Client].
-func (el *Element) Call(ctx context.Context, sessionID, methodName string, params interface{}) (res []byte, err error) {
+func (el *Element) Call(ctx context.Context, sessionID, methodName string, params any) (res []byte, err error) {
 	return el.page.Call(ctx, sessionID, methodName, params)
 }
 
 // Eval is a shortcut for [Element.Evaluate] with AwaitPromise, ByValue and AutoExp set to true.
-func (el *Element) Eval(js string, params ...interface{}) (*proto.RuntimeRemoteObject, error) {
+func (el *Element) Eval(js string, params ...any) (*proto.RuntimeRemoteObject, error) {
 	return el.Evaluate(Eval(js, params...).ByPromise())
 }
 

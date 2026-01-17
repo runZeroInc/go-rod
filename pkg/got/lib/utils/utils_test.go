@@ -11,7 +11,7 @@ import (
 func TestSmartCompare(t *testing.T) {
 	now := time.Now()
 
-	circular := map[int]interface{}{}
+	circular := map[int]any{}
 	circular[0] = circular
 
 	fn := func() {}
@@ -20,9 +20,9 @@ func TestSmartCompare(t *testing.T) {
 	ch2 := make(chan int, 1)
 
 	testCases := []struct {
-		x interface{}
-		y interface{}
-		s interface{}
+		x any
+		y any
+		s any
 	}{
 		{1, 1, 0.0},
 		{1, 3.0, -2.0},
@@ -36,7 +36,7 @@ func TestSmartCompare(t *testing.T) {
 		{now.Add(time.Second), now, float64(time.Second)},
 		{circular, circular, 0.0},
 		{circular, 0, 1.0},
-		{map[int]interface{}{1: 1.0}, map[int]interface{}{1: 1}, 1.0},
+		{map[int]any{1: 1.0}, map[int]any{1: 1}, 1.0},
 		{[]byte(nil), nil, 0.0},
 	}
 	for i, c := range testCases {
@@ -57,7 +57,7 @@ func TestCompare(t *testing.T) {
 }
 
 func TestOthers(t *testing.T) {
-	vs := utils.ToValues([]interface{}{1})
+	vs := utils.ToValues([]any{1})
 
 	if utils.ToInterfaces(vs)[0] != 1 {
 		t.Error("fail")

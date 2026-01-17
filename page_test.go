@@ -557,7 +557,7 @@ func TestPageWaitStable(t *testing.T) {
 	p.MustWaitStable()
 
 	g.Panic(func() {
-		g.mc.setCall(func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error) {
+		g.mc.setCall(func(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
 			switch method {
 			case (proto.DOMSnapshotCaptureSnapshot{}).ProtoReq():
 				utils.Sleep(0.3)
@@ -573,7 +573,7 @@ func TestPageWaitStable(t *testing.T) {
 		p.MustWaitStable()
 	})
 	g.Panic(func() {
-		g.mc.setCall(func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error) {
+		g.mc.setCall(func(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
 			switch method {
 			case (proto.DOMSnapshotCaptureSnapshot{}).ProtoReq():
 				return nil, errors.New("error")

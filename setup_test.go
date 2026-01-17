@@ -133,7 +133,7 @@ func (g G) enableCDPLog() {
 	g.mc.principal.Logger(rod.DefaultLogger)
 }
 
-func (g G) dump(args ...interface{}) {
+func (g G) dump(args ...any) {
 	g.Log(utils.Dump(args...))
 }
 
@@ -167,7 +167,7 @@ func (g G) newPage(u ...string) *rod.Page {
 	return p
 }
 
-type Call func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error)
+type Call func(ctx context.Context, sessionID, method string, params any) ([]byte, error)
 
 var _ rod.CDPClient = &MockClient{}
 
@@ -206,7 +206,7 @@ func (mc *MockClient) Event() <-chan *cdp.Event {
 	return mc.principal.Event()
 }
 
-func (mc *MockClient) Call(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error) {
+func (mc *MockClient) Call(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
 	return mc.getCall()(ctx, sessionID, method, params)
 }
 
@@ -253,7 +253,7 @@ func (mc *MockClient) stubCounter() {
 
 	fmt.Fprintln(os.Stdout, "[stubCounter] begin")
 
-	mc.setCall(func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error) {
+	mc.setCall(func(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
 		l.Lock()
 		mCount[method]++
 		m := fmt.Sprintf("%d, proto.%s{}", mCount[method], proto.GetType(method).Name())
@@ -276,7 +276,7 @@ func (mc *MockClient) stub(nth int, p proto.Request, fn func(send StubSend) (gso
 
 	count := int64(0)
 
-	mc.setCall(func(ctx context.Context, sessionID, method string, params interface{}) ([]byte, error) {
+	mc.setCall(func(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
 		if method == p.ProtoReq() {
 			if int(atomic.AddInt64(&count, 1)) == nth {
 				mc.resetCall()

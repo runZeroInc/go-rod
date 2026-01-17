@@ -25,7 +25,7 @@ type Assertions struct {
 }
 
 // Desc returns a clone with the format description. The description will be printed before the error message.
-func (as Assertions) Desc(format string, args ...interface{}) Assertions {
+func (as Assertions) Desc(format string, args ...any) Assertions {
 	n := as
 	n.desc = append(n.desc, fmt.Sprintf(format, args...))
 	return n
@@ -41,7 +41,7 @@ func (as Assertions) Must() Assertions {
 // Eq asserts that x equals y when converted to the same type, such as compare float 1.0 and integer 1 .
 // For strict value and type comparison use Assertions.Equal .
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Eq(x, y interface{}) {
+func (as Assertions) Eq(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) == 0 {
 		return
@@ -51,7 +51,7 @@ func (as Assertions) Eq(x, y interface{}) {
 
 // Neq asserts that x not equals y even when converted to the same type.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Neq(x, y interface{}) {
+func (as Assertions) Neq(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) != 0 {
 		return
@@ -69,7 +69,7 @@ func (as Assertions) Neq(x, y interface{}) {
 
 // Equal asserts that x equals y.
 // For loose type comparison use Assertions.Eq, such as compare float 1.0 and integer 1 .
-func (as Assertions) Equal(x, y interface{}) {
+func (as Assertions) Equal(x, y any) {
 	as.Helper()
 	if utils.Compare(x, y) == 0 {
 		return
@@ -79,7 +79,7 @@ func (as Assertions) Equal(x, y interface{}) {
 
 // Gt asserts that x is greater than y.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Gt(x, y interface{}) {
+func (as Assertions) Gt(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) > 0 {
 		return
@@ -89,7 +89,7 @@ func (as Assertions) Gt(x, y interface{}) {
 
 // Gte asserts that x is greater than or equal to y.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Gte(x, y interface{}) {
+func (as Assertions) Gte(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) >= 0 {
 		return
@@ -99,7 +99,7 @@ func (as Assertions) Gte(x, y interface{}) {
 
 // Lt asserts that x is less than y.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Lt(x, y interface{}) {
+func (as Assertions) Lt(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) < 0 {
 		return
@@ -109,7 +109,7 @@ func (as Assertions) Lt(x, y interface{}) {
 
 // Lte asserts that x is less than or equal to b.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Lte(x, y interface{}) {
+func (as Assertions) Lte(x, y any) {
 	as.Helper()
 	if utils.SmartCompare(x, y) <= 0 {
 		return
@@ -119,7 +119,7 @@ func (as Assertions) Lte(x, y interface{}) {
 
 // InDelta asserts that x and y are within the delta of each other.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) InDelta(x, y interface{}, delta float64) {
+func (as Assertions) InDelta(x, y any, delta float64) {
 	as.Helper()
 	if math.Abs(utils.SmartCompare(x, y)) <= delta {
 		return
@@ -146,7 +146,7 @@ func (as Assertions) False(x bool) {
 }
 
 // Nil asserts that the last item in args is nilable and nil
-func (as Assertions) Nil(args ...interface{}) {
+func (as Assertions) Nil(args ...any) {
 	as.Helper()
 	if len(args) == 0 {
 		as.err(AssertionNoArgs)
@@ -160,7 +160,7 @@ func (as Assertions) Nil(args ...interface{}) {
 }
 
 // NotNil asserts that the last item in args is nilable and not nil
-func (as Assertions) NotNil(args ...interface{}) {
+func (as Assertions) NotNil(args ...any) {
 	as.Helper()
 	if len(args) == 0 {
 		as.err(AssertionNoArgs)
@@ -185,7 +185,7 @@ func (as Assertions) NotNil(args ...interface{}) {
 }
 
 // Zero asserts x is zero value for its type.
-func (as Assertions) Zero(x interface{}) {
+func (as Assertions) Zero(x any) {
 	as.Helper()
 	if reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface()) {
 		return
@@ -194,7 +194,7 @@ func (as Assertions) Zero(x interface{}) {
 }
 
 // NotZero asserts that x is not zero value for its type.
-func (as Assertions) NotZero(x interface{}) {
+func (as Assertions) NotZero(x any) {
 	as.Helper()
 	if reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface()) {
 		as.err(AssertionNotZero, x)
@@ -213,7 +213,7 @@ func (as Assertions) Regex(pattern, str string) {
 // Has asserts that container has item.
 // The container can be a string, []byte, slice, array, or map.
 // For how comparison works, see [utils.SmartCompare] .
-func (as Assertions) Has(container, item interface{}) {
+func (as Assertions) Has(container, item any) {
 	as.Helper()
 
 	if c, ok := container.(string); ok && hasStr(c, item) {
@@ -243,7 +243,7 @@ func (as Assertions) Has(container, item interface{}) {
 }
 
 // Len asserts that the length of list equals l
-func (as Assertions) Len(list interface{}, l int) {
+func (as Assertions) Len(list any, l int) {
 	as.Helper()
 	actual := reflect.ValueOf(list).Len()
 	if actual == l {
@@ -253,7 +253,7 @@ func (as Assertions) Len(list interface{}, l int) {
 }
 
 // Err asserts that the last item in args is error
-func (as Assertions) Err(args ...interface{}) {
+func (as Assertions) Err(args ...any) {
 	as.Helper()
 	if len(args) == 0 {
 		as.err(AssertionNoArgs)
@@ -267,13 +267,13 @@ func (as Assertions) Err(args ...interface{}) {
 }
 
 // E is a shortcut for Must().Nil(args...)
-func (as Assertions) E(args ...interface{}) {
+func (as Assertions) E(args ...any) {
 	as.Helper()
 	as.Must().Nil(args...)
 }
 
 // Panic executes fn and asserts that fn panics
-func (as Assertions) Panic(fn func()) (val interface{}) {
+func (as Assertions) Panic(fn func()) (val any) {
 	as.Helper()
 
 	defer func() {
@@ -292,7 +292,7 @@ func (as Assertions) Panic(fn func()) (val interface{}) {
 
 // Is asserts that x is kind of y, it uses reflect.Kind to compare.
 // If x and y are both error type, it will use errors.Is to compare.
-func (as Assertions) Is(x, y interface{}) {
+func (as Assertions) Is(x, y any) {
 	as.Helper()
 
 	if x == nil && y == nil {
@@ -336,7 +336,7 @@ func (as Assertions) Count(n int) func() {
 	}
 }
 
-func (as Assertions) err(t AssertionErrType, details ...interface{}) {
+func (as Assertions) err(t AssertionErrType, details ...any) {
 	as.Helper()
 
 	if len(as.desc) > 0 {
@@ -364,7 +364,7 @@ func (as Assertions) err(t AssertionErrType, details ...interface{}) {
 	as.Fail()
 }
 
-func hasStr(c string, item interface{}) bool {
+func hasStr(c string, item any) bool {
 	if it, ok := item.(string); ok {
 		if strings.Contains(c, it) {
 			return true

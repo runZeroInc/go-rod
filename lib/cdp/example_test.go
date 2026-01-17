@@ -47,7 +47,7 @@ func Example_customize_cdp_log() {
 	ws := cdp.MustConnectWS(launcher.NewMust().MustLaunch())
 
 	cdp.New().
-		Logger(utils.Log(func(args ...interface{}) {
+		Logger(utils.Log(func(args ...any) {
 			switch v := args[0].(type) {
 			case *cdp.Request:
 				fmt.Printf("id: %d", v.ID)

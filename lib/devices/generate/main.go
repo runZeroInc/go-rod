@@ -91,7 +91,7 @@ func normalizeName(name string) string {
 	name = strings.ReplaceAll(name, "/", "or")
 
 	list := []string{}
-	for _, s := range strings.Split(name, " ") {
+	for s := range strings.SplitSeq(name, " ") {
 		if len(s) > 1 {
 			list = append(list, strings.ToUpper(s[0:1])+s[1:])
 		} else {

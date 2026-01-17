@@ -75,8 +75,8 @@ func Test(t *testing.T) {
 	eq(j.Get("a.b").Int(), 1)
 	eq(j.Get("c.1").Str(), "y")
 
-	v, _ := j.Gets("c", gson.Query(func(i interface{}) (val interface{}, has bool) {
-		return i.([]interface{})[1], true
+	v, _ := j.Gets("c", gson.Query(func(i any) (val any, has bool) {
+		return i.([]any)[1], true
 	}))
 	eq(v.Str(), "y")
 
@@ -192,8 +192,8 @@ func n(s string) (j gson.JSON) {
 	return
 }
 
-func genEq(t *testing.T) func(a, b interface{}) {
-	return func(a, b interface{}) {
+func genEq(t *testing.T) func(a, b any) {
+	return func(a, b any) {
 		t.Helper()
 		if !reflect.DeepEqual(a, b) {
 			t.Log(a, "!=", b)

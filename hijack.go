@@ -210,7 +210,7 @@ type Hijack struct {
 	continueRequest *proto.FetchContinueRequest
 
 	// CustomState is used to store things for this context
-	CustomState interface{}
+	CustomState any
 
 	browser *Browser
 }
@@ -303,7 +303,7 @@ func (ctx *HijackRequest) SetContext(c context.Context) *HijackRequest {
 }
 
 // SetBody of the request, if obj is []byte or string, raw body will be used, else it will be encoded as json.
-func (ctx *HijackRequest) SetBody(obj interface{}) *HijackRequest {
+func (ctx *HijackRequest) SetBody(obj any) *HijackRequest {
 	var b []byte
 
 	switch body := obj.(type) {
@@ -391,7 +391,7 @@ func (ctx *HijackResponse) AddHeader(pairs ...string) *HijackResponse {
 }
 
 // SetBody of the payload, if obj is []byte or string, raw body will be used, else it will be encoded as json.
-func (ctx *HijackResponse) SetBody(obj interface{}) *HijackResponse {
+func (ctx *HijackResponse) SetBody(obj any) *HijackResponse {
 	switch body := obj.(type) {
 	case []byte:
 		ctx.payload.Body = body

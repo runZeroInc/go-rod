@@ -6,7 +6,7 @@ import (
 )
 
 // Event interface
-type Event interface{}
+type Event any
 
 // Events channel
 type Events <-chan Event

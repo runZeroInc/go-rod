@@ -1,5 +1,4 @@
 //go:build dragonfly
-// +build dragonfly
 
 package launcher
 

@@ -70,7 +70,7 @@ const (
 // AssertionCtx holds the context of an assertion
 type AssertionCtx struct {
 	Type    AssertionErrType
-	Details []interface{}
+	Details []any
 	File    string
 	Line    int
 }
@@ -91,12 +91,12 @@ func (ae AssertionErrorReport) Report(ac *AssertionCtx) string {
 }
 
 type defaultAssertionError struct {
-	fns map[AssertionErrType]func(details ...interface{}) string
+	fns map[AssertionErrType]func(details ...any) string
 }
 
 // NewDefaultAssertionError handler
 func NewDefaultAssertionError(theme gop.Theme, diffTheme diff.Theme) AssertionError {
-	f := func(v interface{}) string {
+	f := func(v any) string {
 		return gop.Format(gop.Tokenize(v), theme)
 	}
 
@@ -104,8 +104,8 @@ func NewDefaultAssertionError(theme gop.Theme, diffTheme diff.Theme) AssertionEr
 		return " " + gop.Stylize("⦗"+s+"⦘", theme(gop.Error)) + " "
 	}
 
-	fns := map[AssertionErrType]func(details ...interface{}) string{
-		AssertionEq: func(details ...interface{}) string {
+	fns := map[AssertionErrType]func(details ...any) string{
+		AssertionEq: func(details ...any) string {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
@@ -124,107 +124,107 @@ func NewDefaultAssertionError(theme gop.Theme, diffTheme diff.Theme) AssertionEr
 			dx, dy := diff.TokenizeLine(ctx, gop.StripANSI(x), gop.StripANSI(y))
 			return diff.Format(dx, diffTheme) + k("not ==") + diff.Format(dy, diffTheme)
 		},
-		AssertionNeqSame: func(details ...interface{}) string {
+		AssertionNeqSame: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("=="), y)
 		},
-		AssertionNeq: func(details ...interface{}) string {
+		AssertionNeq: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("=="), y, k("when converted to the same type"))
 		},
-		AssertionGt: func(details ...interface{}) string {
+		AssertionGt: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("not >"), y)
 		},
-		AssertionGte: func(details ...interface{}) string {
+		AssertionGte: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("not ≥"), y)
 		},
-		AssertionLt: func(details ...interface{}) string {
+		AssertionLt: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("not <"), y)
 		},
-		AssertionLte: func(details ...interface{}) string {
+		AssertionLte: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("not ≤"), y)
 		},
-		AssertionInDelta: func(details ...interface{}) string {
+		AssertionInDelta: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			delta := f(details[2])
 			return j(k("delta between"), x, k("and"), y, k("not ≤"), delta)
 		},
-		AssertionTrue: func(_ ...interface{}) string {
+		AssertionTrue: func(_ ...any) string {
 			return k("should be") + f(true)
 		},
-		AssertionFalse: func(_ ...interface{}) string {
+		AssertionFalse: func(_ ...any) string {
 			return k("should be") + f(false)
 		},
-		AssertionNil: func(details ...interface{}) string {
+		AssertionNil: func(details ...any) string {
 			last := f(details[0])
 			return j(k("last argument"), last, k("should be"), f(nil))
 		},
-		AssertionNoArgs: func(_ ...interface{}) string {
+		AssertionNoArgs: func(_ ...any) string {
 			return k("no arguments received")
 		},
-		AssertionNotNil: func(_ ...interface{}) string {
+		AssertionNotNil: func(_ ...any) string {
 			return k("last argument shouldn't be") + f(nil)
 		},
-		AssertionNotNilable: func(details ...interface{}) string {
+		AssertionNotNilable: func(details ...any) string {
 			last := f(details[0])
 			return j(k("last argument"), last, k("is not nilable"))
 		},
-		AssertionNotNilableNil: func(details ...interface{}) string {
+		AssertionNotNilableNil: func(details ...any) string {
 			last := f(details[0])
 			return j(k("last argument"), last, k("shouldn't be"), f(nil))
 		},
-		AssertionZero: func(details ...interface{}) string {
+		AssertionZero: func(details ...any) string {
 			x := f(details[0])
 			return j(x, k("should be zero value for its type"))
 		},
-		AssertionNotZero: func(details ...interface{}) string {
+		AssertionNotZero: func(details ...any) string {
 			x := f(details[0])
 			return j(x, k("shouldn't be zero value for its type"))
 		},
-		AssertionRegex: func(details ...interface{}) string {
+		AssertionRegex: func(details ...any) string {
 			pattern := f(details[0])
 			str := f(details[1])
 			return j(pattern, k("should match"), str)
 		},
-		AssertionHas: func(details ...interface{}) string {
+		AssertionHas: func(details ...any) string {
 			container := f(details[0])
 			str := f(details[1])
 			return j(container, k("should has"), str)
 		},
-		AssertionLen: func(details ...interface{}) string {
+		AssertionLen: func(details ...any) string {
 			actual := f(details[0])
 			l := f(details[1])
 			return k("expect len") + actual + k("to be") + l
 		},
-		AssertionErr: func(details ...interface{}) string {
+		AssertionErr: func(details ...any) string {
 			last := f(details[0])
 			return j(k("last value"), last, k("should be <error>"))
 		},
-		AssertionPanic: func(_ ...interface{}) string {
+		AssertionPanic: func(_ ...any) string {
 			return k("should panic")
 		},
-		AssertionIsInChain: func(details ...interface{}) string {
+		AssertionIsInChain: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("should in chain of"), y)
 		},
-		AssertionIsKind: func(details ...interface{}) string {
+		AssertionIsKind: func(details ...any) string {
 			x := f(details[0])
 			y := f(details[1])
 			return j(x, k("should be kind of"), y)
 		},
-		AssertionCount: func(details ...interface{}) string {
+		AssertionCount: func(details ...any) string {
 			n := f(details[0])
 			count := f(details[1])
 			return k("should count") + n + k("times, but got") + count
@@ -241,7 +241,7 @@ func (ae *defaultAssertionError) Report(ac *AssertionCtx) string {
 
 func j(args ...string) string {
 	if hasNewline(args...) {
-		for i := 0; i < len(args); i++ {
+		for i := range args {
 			args[i] = strings.Trim(args[i], " ")
 		}
 		return "\n" + strings.Join(args, "\n\n")

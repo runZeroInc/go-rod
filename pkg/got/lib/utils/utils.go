@@ -9,14 +9,14 @@ import (
 	"github.com/runZeroInc/go-rod/pkg/gop"
 )
 
-var float64Type = reflect.TypeOf(0.0)
+var float64Type = reflect.TypeFor[float64]()
 
 // SmartCompare returns the float value of x minus y.
 // If x and y are numerical types, the result will be the subtraction between them, such as x is int(1), y is float64(1.2),
 // the result will be -0.2 . time.Time is also a numerical value.
 // If x or y are not numerical types, both of them will be converted to string format of its value type, the result will be
 // the strings.Compare result between them, such as x is int(1), y is "a", the result will be 1 .
-func SmartCompare(x, y interface{}) float64 {
+func SmartCompare(x, y any) float64 {
 	_, xNil := IsNil(x)
 	_, yNil := IsNil(y)
 	if xNil && yNil {
@@ -46,13 +46,13 @@ func SmartCompare(x, y interface{}) float64 {
 }
 
 // Compare returns the float value of x minus y
-func Compare(x, y interface{}) float64 {
+func Compare(x, y any) float64 {
 	return float64(strings.Compare(gop.Plain(x), gop.Plain(y)))
 }
 
 // ToInterfaces convertor
-func ToInterfaces(vs []reflect.Value) []interface{} {
-	out := []interface{}{}
+func ToInterfaces(vs []reflect.Value) []any {
+	out := []any{}
 	for _, v := range vs {
 		out = append(out, v.Interface())
 	}
@@ -60,7 +60,7 @@ func ToInterfaces(vs []reflect.Value) []interface{} {
 }
 
 // ToValues convertor
-func ToValues(vs []interface{}) []reflect.Value {
+func ToValues(vs []any) []reflect.Value {
 	out := []reflect.Value{}
 	for _, v := range vs {
 		out = append(out, reflect.ValueOf(v))
@@ -69,7 +69,7 @@ func ToValues(vs []interface{}) []reflect.Value {
 }
 
 // IsNil returns true, true if the value is nilable and is nil.
-func IsNil(x interface{}) (bool, bool) {
+func IsNil(x any) (bool, bool) {
 	if x == nil {
 		return true, true
 	}

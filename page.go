@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -680,7 +681,7 @@ func (p *Page) WaitOpen() func() (*Page, error) {
 //	go page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
 //	    _ = proto.PageHandleJavaScriptDialog{ Accept: false, PromptText: ""}.Call(page)
 //	})()
-func (p *Page) EachEvent(callbacks ...interface{}) (wait func()) {
+func (p *Page) EachEvent(callbacks ...any) (wait func()) {
 	return p.browser.Context(p.ctx).eachEvent(p.SessionID, callbacks...)
 }
 
@@ -747,10 +748,8 @@ func (p *Page) WaitRequestIdle(
 	}
 
 	wait := p.EachEvent(func(sent *proto.NetworkRequestWillBeSent) {
-		for _, t := range excludeTypes {
-			if sent.Type == t {
-				return
-			}
+		if slices.Contains(excludeTypes, sent.Type) {
+			return
 		}
 
 		if match(sent.Request.URL) {
@@ -1005,7 +1004,7 @@ func (p *Page) Release(obj *proto.RuntimeRemoteObject) error {
 }
 
 // Call implements the [proto.Client].
-func (p *Page) Call(ctx context.Context, sessionID, methodName string, params interface{}) (res []byte, err error) {
+func (p *Page) Call(ctx context.Context, sessionID, methodName string, params any) (res []byte, err error) {
 	return p.browser.Call(ctx, sessionID, methodName, params)
 }
 

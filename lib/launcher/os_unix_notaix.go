@@ -1,5 +1,4 @@
 //go:build !(windows || aix)
-// +build !windows,!aix
 
 package launcher
 

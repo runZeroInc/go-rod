@@ -51,7 +51,7 @@ func TestCountSleeperErr(t *testing.T) {
 
 	ctx := g.Context()
 	s := utils.CountSleeper(5)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_ = s(ctx)
 	}
 	g.Err(s(ctx))

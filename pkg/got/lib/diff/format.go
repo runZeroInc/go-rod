@@ -2,6 +2,7 @@ package diff
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/runZeroInc/go-rod/pkg/gop"
@@ -50,14 +51,14 @@ func Tokenize(ctx context.Context, x, y string) []*Token {
 
 // Format tokens into a human readable string
 func Format(ts []*Token, theme Theme) string {
-	out := ""
+	var out strings.Builder
 
 	for _, t := range ts {
 		s := t.Literal
-		out += gop.Stylize(s, theme(t.Type))
+		out.WriteString(gop.Stylize(s, theme(t.Type)))
 	}
 
-	return out
+	return out.String()
 }
 
 // Narrow the context around each diff section to n lines.
@@ -133,11 +134,4 @@ func Words(ctx context.Context, lines []*TokenLine) {
 	}
 
 	df()
-}
-
-func max(x, y int) int {
-	if x < y {
-		return y
-	}
-	return x
 }

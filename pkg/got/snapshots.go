@@ -33,7 +33,7 @@ func (g G) loadSnapshots() {
 			return
 		}
 
-		g.snapshots.Range(func(path, data interface{}) bool {
+		g.snapshots.Range(func(path, data any) bool {
 			s := data.(snapshot)
 			if !s.used {
 				g.E(os.Remove(path.(string)))
@@ -50,7 +50,7 @@ func (g G) loadSnapshots() {
 // It will auto-remove the unused snapshot files after the test.
 // The snapshot files should be version controlled.
 // The format of the snapshot file is json.
-func (g G) Snapshot(name string, x interface{}) {
+func (g G) Snapshot(name string, x any) {
 	g.Helper()
 
 	path := filepath.Join(g.snapshotsDir(), escapeFileName(name)+snapshotJSONExt)

@@ -25,7 +25,7 @@ type ReqMIME string
 //	Req("GET", "http://example.com", context.TODO())
 //	Req("POST", "http://example.com", map[string]any{"a": 1})
 //	Req("POST", "http://example.com", http.Header{"Host": "example.com"}, ReqMIME(".json"), map[string]any{"a": 1})
-func (ut Utils) Req(method, url string, options ...interface{}) *ResHelper {
+func (ut Utils) Req(method, url string, options ...any) *ResHelper {
 	ut.Helper()
 
 	header := http.Header{}
@@ -88,14 +88,14 @@ func (res *ResHelper) String() string {
 }
 
 // JSON parses body as json and returns the result
-func (res *ResHelper) JSON() (v interface{}) {
+func (res *ResHelper) JSON() (v any) {
 	res.ut.Helper()
 	res.ut.err(res.err)
 	return res.ut.JSON(res.Body)
 }
 
 // Unmarshal body to v as json, it's like [json.Unmarshal].
-func (res *ResHelper) Unmarshal(v interface{}) {
+func (res *ResHelper) Unmarshal(v any) {
 	res.ut.Helper()
 	res.ut.err(json.Unmarshal(res.Bytes().Bytes(), v))
 }
@@ -114,6 +114,6 @@ func (ut Utils) err(err error) {
 }
 
 // there no way to stop a blocking test from outside
-var panicWithTrace = func(v interface{}) {
+var panicWithTrace = func(v any) {
 	panic(v)
 }

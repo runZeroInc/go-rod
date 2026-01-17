@@ -1,5 +1,4 @@
 //go:build !(linux || windows || darwin || freebsd || dragonfly || netbsd || openbsd)
-// +build !linux,!windows,!darwin,!freebsd,!dragonfly,!netbsd,!openbsd
 
 package launcher
 

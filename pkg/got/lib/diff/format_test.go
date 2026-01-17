@@ -127,19 +127,19 @@ func TestTwoLines(t *testing.T) {
 	g := setup(t)
 
 	format := func(ts []*diff.Token) string {
-		out := ""
+		var out strings.Builder
 		for _, t := range ts {
 			txt := strings.TrimSpace(strings.ReplaceAll(t.Literal, "", " "))
 			switch t.Type {
 			case diff.DelWords:
-				out += "-" + txt
+				out.WriteString("-" + txt)
 			case diff.AddWords:
-				out += "+" + txt
+				out.WriteString("+" + txt)
 			default:
-				out += "=" + txt
+				out.WriteString("=" + txt)
 			}
 		}
-		return out
+		return out.String()
 	}
 
 	check := func(x, y, ex, ey string) {

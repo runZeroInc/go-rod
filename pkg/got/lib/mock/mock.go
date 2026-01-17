@@ -20,13 +20,13 @@ type Mock struct {
 
 	fallback reflect.Value
 
-	stubs map[string]interface{}
+	stubs map[string]any
 
 	calls map[string][]Call
 }
 
 // Fallback the methods that are not stubbed to fb.
-func (m *Mock) Fallback(fb interface{}) {
+func (m *Mock) Fallback(fb any) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -78,7 +78,7 @@ func toMock(mock Fallbackable) *Mock {
 	return reflect.Indirect(reflect.ValueOf(mock)).FieldByName("Mock").Addr().Interface().(*Mock)
 }
 
-func fnName(fn interface{}) string {
+func fnName(fn any) string {
 	fv := reflect.ValueOf(fn)
 
 	fi := runtime.FuncForPC(fv.Pointer())

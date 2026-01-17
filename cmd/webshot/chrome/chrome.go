@@ -424,6 +424,8 @@ func (w *Webshot) GetCleanEnv(baseDir string) map[string]string {
 	r["GOOGLE_DEFAULT_CLIENT_ID"] = "no"
 	r["LOGNAME"] = username
 	r["USER"] = username
+	// Disable Microsoft Edge telemetry
+	r["MSEDGEDRIVER_TELEMETRY_OPTOUT"] = "1"
 	return r
 }
 
@@ -628,7 +630,7 @@ func resolvePreferredUIDGID() (int, int, string) {
 	defaultUsers := []string{"webshot-chrome", "nobody", "daemon"}
 	var preferredUsers []string
 	// Check for any users specified in the environment variable
-	for _, envUser := range strings.Split(os.Getenv("WEBSHOT_CHROMIUM_USER"), ",") {
+	for envUser := range strings.SplitSeq(os.Getenv("WEBSHOT_CHROMIUM_USER"), ",") {
 		if envUserClean := strings.TrimSpace(envUser); envUserClean != "" {
 			preferredUsers = append(preferredUsers, envUserClean)
 		}

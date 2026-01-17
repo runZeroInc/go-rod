@@ -92,11 +92,11 @@ type Token struct {
 }
 
 // Tokenize a random Go value
-func Tokenize(v interface{}) []*Token {
+func Tokenize(v any) []*Token {
 	return tokenize(newContext(), reflect.ValueOf(v))
 }
 
-type path []interface{}
+type path []any
 
 func (p path) tokens() []*Token {
 	ts := []*Token{}
@@ -118,7 +118,7 @@ func newContext() context {
 	return context{global: map[uintptr]path{}, path: path{}}
 }
 
-func (ctx context) add(p interface{}) context {
+func (ctx context) add(p any) context {
 	if v := reflect.ValueOf(p); v.Kind() == reflect.Ptr {
 		p = v.Pointer()
 	}
@@ -488,7 +488,7 @@ func tokenizePtr(ctx context, v reflect.Value) []*Token {
 }
 
 func tokenizeJSON(v reflect.Value) ([]*Token, bool) {
-	var jv interface{}
+	var jv any
 	ts := []*Token{}
 	s := ""
 	if v.Kind() == reflect.String {
@@ -507,8 +507,8 @@ func tokenizeJSON(v reflect.Value) ([]*Token, bool) {
 		ts = append(ts, &Token{Func, SymbolJSONBytes})
 	}
 
-	_, isObj := jv.(map[string]interface{})
-	_, isArr := jv.(map[string]interface{})
+	_, isObj := jv.(map[string]any)
+	_, isArr := jv.(map[string]any)
 
 	if isObj || isArr {
 		ts = append(ts, &Token{ParenOpen, "("})

@@ -10,7 +10,7 @@ import (
 const SymbolPtr = "gop.Ptr"
 
 // Ptr returns a pointer to v
-func Ptr(v interface{}) interface{} {
+func Ptr(v any) any {
 	val := reflect.ValueOf(v)
 	ptr := reflect.New(val.Type())
 	ptr.Elem().Set(val)
@@ -21,7 +21,7 @@ func Ptr(v interface{}) interface{} {
 const SymbolCircular = "gop.Circular"
 
 // Circular reference of the path from the root
-func Circular(path ...interface{}) interface{} {
+func Circular(path ...any) any {
 	return nil
 }
 
@@ -56,7 +56,7 @@ func Duration(s string) time.Duration {
 const SymbolJSONStr = "gop.JSONStr"
 
 // JSONStr returns the raw
-func JSONStr(v interface{}, raw string) string {
+func JSONStr(v any, raw string) string {
 	return raw
 }
 
@@ -64,6 +64,6 @@ func JSONStr(v interface{}, raw string) string {
 const SymbolJSONBytes = "gop.JSONBytes"
 
 // JSONBytes returns the raw as []byte
-func JSONBytes(v interface{}, raw string) []byte {
+func JSONBytes(v any, raw string) []byte {
 	return []byte(raw)
 }

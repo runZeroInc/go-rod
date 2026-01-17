@@ -8,7 +8,7 @@ import (
 )
 
 // New JSON from []byte, [io.Reader], or raw value.
-func New(v interface{}) JSON {
+func New(v any) JSON {
 	return JSON{&sync.Mutex{}, &v}
 }
 
@@ -25,7 +25,7 @@ func (j *JSON) UnmarshalJSON(b []byte) error {
 
 // Val of the underlying json value.
 // The first time it's called, it will try to parse the underlying data.
-func (j JSON) Val() interface{} {
+func (j JSON) Val() any {
 	if j.value == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (j JSON) Val() interface{} {
 		}
 	}
 
-	var val interface{}
+	var val any
 	switch v := (*j.value).(type) {
 	case []byte:
 		_ = json.Unmarshal(v, &val)
@@ -56,15 +56,15 @@ func (j JSON) Val() interface{} {
 }
 
 // Set by json path. It's a shortcut for Sets.
-func (j *JSON) Set(path string, val interface{}) *JSON {
+func (j *JSON) Set(path string, val any) *JSON {
 	return j.Sets(val, Path(path)...)
 }
 
-var _map map[string]interface{}
+var _map map[string]any
 var interfaceType = reflect.TypeOf(_map).Elem()
 
 // Sets element by path sections. If a section is not string or int, it will be ignored.
-func (j *JSON) Sets(target interface{}, sections ...interface{}) *JSON {
+func (j *JSON) Sets(target any, sections ...any) *JSON {
 	if j.value == nil {
 		*j = New(nil)
 	}
@@ -90,7 +90,7 @@ func (j *JSON) Sets(target interface{}, sections ...interface{}) *JSON {
 		case reflect.Int:
 			k := int(sect.Int())
 			if val.Kind() != reflect.Slice || val.Len() <= k {
-				nArr := reflect.ValueOf(make([]interface{}, k+1))
+				nArr := reflect.ValueOf(make([]any, k+1))
 				if val.Kind() == reflect.Slice {
 					reflect.Copy(nArr, val)
 				}
@@ -133,7 +133,7 @@ func (j *JSON) Del(path string) *JSON {
 
 // Dels deletes the element at the path sections.
 // Return true if it's deleted.
-func (j *JSON) Dels(sections ...interface{}) bool {
+func (j *JSON) Dels(sections ...any) bool {
 	l := len(sections)
 
 	if l == 0 {

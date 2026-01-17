@@ -15,15 +15,15 @@ import (
 
 // Testable interface. Usually, you use *testing.T as it.
 type Testable interface {
-	Name() string                            // same as testing.common.Name
-	Skipped() bool                           // same as testing.common.Skipped
-	Failed() bool                            // same as testing.common.Failed
-	Cleanup(func())                          // same as testing.common.Cleanup
-	FailNow()                                // same as testing.common.FailNow
-	Fail()                                   // same as testing.common.Fail
-	Helper()                                 // same as testing.common.Helper
-	Logf(format string, args ...interface{}) // same as testing.common.Logf
-	SkipNow()                                // same as testing.common.Skip
+	Name() string                    // same as testing.common.Name
+	Skipped() bool                   // same as testing.common.Skipped
+	Failed() bool                    // same as testing.common.Failed
+	Cleanup(func())                  // same as testing.common.Cleanup
+	FailNow()                        // same as testing.common.FailNow
+	Fail()                           // same as testing.common.Fail
+	Helper()                         // same as testing.common.Helper
+	Logf(format string, args ...any) // same as testing.common.Logf
+	SkipNow()                        // same as testing.common.Skip
 }
 
 // G is the helper context, it provides some handy helpers for testing
@@ -103,7 +103,7 @@ func Parallel() (n int) {
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "test.parallel" {
-			v := reflect.ValueOf(f.Value).Elem().Convert(reflect.TypeOf(n))
+			v := reflect.ValueOf(f.Value).Elem().Convert(reflect.TypeFor[int]())
 			n = v.Interface().(int)
 		}
 	})

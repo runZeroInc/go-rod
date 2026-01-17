@@ -15,7 +15,7 @@ func TestPanicAfter(t *testing.T) {
 	wait := make(chan struct{})
 
 	old := panicWithTrace
-	panicWithTrace = func(v interface{}) {
+	panicWithTrace = func(v any) {
 		ut.Eq(v, "TestPanicAfter timeout after 1ns")
 		close(wait)
 	}

@@ -14,9 +14,9 @@ import (
 type Client struct {
 	sessionID  string
 	methodName string
-	params     interface{}
+	params     any
 	err        error
-	ret        interface{}
+	ret        any
 }
 
 var (
@@ -25,7 +25,7 @@ var (
 	_ proto.Contextable = &Client{}
 )
 
-func (c *Client) Call(_ context.Context, sessionID, methodName string, params interface{}) (res []byte, err error) {
+func (c *Client) Call(_ context.Context, sessionID, methodName string, params any) (res []byte, err error) {
 	c.sessionID = sessionID
 	c.methodName = methodName
 	c.params = params
@@ -49,7 +49,7 @@ func (t T) ParseMethodName() {
 
 func (t T) GetType() {
 	method := proto.GetType("Page.enable")
-	t.Eq(reflect.TypeOf(proto.PageEnable{}), method)
+	t.Eq(reflect.TypeFor[proto.PageEnable](), method)
 }
 
 func (t T) TimeCodec() {

@@ -18,7 +18,7 @@ func Stub[M any](mock Fallbackable, method M, stub M) {
 	defer m.lock.Unlock()
 
 	if m.stubs == nil {
-		m.stubs = map[string]interface{}{}
+		m.stubs = map[string]any{}
 	}
 
 	name := fnName(method)
@@ -35,7 +35,7 @@ type StubOn struct {
 type StubWhen struct {
 	lock  *sync.Mutex
 	on    *StubOn
-	in    []interface{}
+	in    []any
 	ret   *StubReturn
 	count int // how many times this stub has been matched
 }
@@ -62,8 +62,8 @@ func On[M any](mock Fallbackable, method M) *StubOn {
 		when: []*StubWhen{},
 	}
 
-	eq := func(in, arg []interface{}) bool {
-		for i := 0; i < len(in); i++ {
+	eq := func(in, arg []any) bool {
+		for i := range in {
 			if in[i] != Any && utils.Compare(in[i], arg[i]) != 0 {
 				return false
 			}
@@ -103,14 +103,14 @@ func On[M any](mock Fallbackable, method M) *StubOn {
 var Any = struct{}{}
 
 // When input args of stubbed method matches in
-func (s *StubOn) When(in ...interface{}) *StubWhen {
+func (s *StubOn) When(in ...any) *StubWhen {
 	w := &StubWhen{lock: &sync.Mutex{}, on: s, in: in}
 	s.when = append(s.when, w)
 	return w
 }
 
 // Return the out as the return values of stubbed method
-func (s *StubWhen) Return(out ...interface{}) *StubReturn {
+func (s *StubWhen) Return(out ...any) *StubReturn {
 	r := &StubReturn{on: s.on, out: utils.ToValues(out)}
 	r.Times(0)
 	s.ret = r

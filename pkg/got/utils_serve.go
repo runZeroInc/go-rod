@@ -56,7 +56,7 @@ func (rt *Router) URL(path ...string) string {
 
 // Route on the pattern. Check the doc of [http.ServeMux] for the syntax of pattern.
 // It will use [Utils.HandleHTTP] to handle each request.
-func (rt *Router) Route(pattern, file string, value ...interface{}) *Router {
+func (rt *Router) Route(pattern, file string, value ...any) *Router {
 	h := rt.ut.HandleHTTP(file, value...)
 
 	rt.Mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -68,8 +68,8 @@ func (rt *Router) Route(pattern, file string, value ...interface{}) *Router {
 
 // HandleHTTP handles a request. If file exists serve the file content. The file will be used to set the Content-Type header.
 // If the file doesn't exist, the value will be encoded by [Utils.Write] and used as the response body.
-func (ut Utils) HandleHTTP(file string, value ...interface{}) func(http.ResponseWriter, *http.Request) {
-	var obj interface{}
+func (ut Utils) HandleHTTP(file string, value ...any) func(http.ResponseWriter, *http.Request) {
+	var obj any
 	if len(value) > 1 {
 		obj = value
 	} else if len(value) == 1 {

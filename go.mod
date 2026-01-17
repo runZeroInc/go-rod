@@ -6,7 +6,7 @@ require (
 	github.com/gobwas/ws v1.4.0
 	github.com/gofrs/flock v0.13.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sys v0.40.0
 )
 

@@ -19,7 +19,7 @@ import (
 	"github.com/runZeroInc/go-rod/pkg/gop"
 )
 
-func eq(t *testing.T, a, b interface{}) {
+func eq(t *testing.T, a, b any) {
 	t.Helper()
 	if a == b {
 		return
@@ -35,7 +35,7 @@ func randStr(l int) string {
 	return hex.EncodeToString(b)[:l]
 }
 
-func render(value string, data interface{}) string {
+func render(value string, data any) string {
 	out := bytes.NewBuffer(nil)
 	t := template.New("")
 	t, err := t.Parse(value)
@@ -49,7 +49,7 @@ func render(value string, data interface{}) string {
 	return out.String()
 }
 
-func assertPanic(t *testing.T, fn func()) (val interface{}) {
+func assertPanic(t *testing.T, fn func()) (val any) {
 	t.Helper()
 
 	defer func() {
@@ -82,10 +82,10 @@ func TestTokenize(t *testing.T) {
 	ch2 := make(chan string, 3)
 	ch3 := make(chan struct{})
 
-	v := []interface{}{
+	v := []any{
 		nil,
 		[]int{},
-		[]interface{}{true, false, uintptr(0x17), float32(100.121111133)},
+		[]any{true, false, uintptr(0x17), float32(100.121111133)},
 		true, 10, int8(2), int32(100),
 		float64(100.121111133),
 		complex64(1 + 2i), complex128(1 + 2i),
@@ -94,7 +94,7 @@ func TestTokenize(t *testing.T) {
 		ch2,
 		ch3,
 		fn,
-		map[interface{}]interface{}{
+		map[any]any{
 			`"test"`: 10,
 			"a":      1,
 			&ref:     1,
@@ -135,7 +135,7 @@ func TestTokenize(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expected := render(string(tpl), map[string]interface{}{
+		expected := render(string(tpl), map[string]any{
 			"ch1": fmt.Sprintf("0x%x", reflect.ValueOf(ch1).Pointer()),
 			"ch2": fmt.Sprintf("0x%x", reflect.ValueOf(ch2).Pointer()),
 			"ch3": fmt.Sprintf("0x%x", reflect.ValueOf(ch3).Pointer()),
@@ -235,7 +235,7 @@ func TestCircularNilRef(t *testing.T) {
 }
 
 func TestCircularMap(t *testing.T) {
-	a := map[int]interface{}{}
+	a := map[int]any{}
 	a[0] = a
 
 	ts := gop.Tokenize(a)
@@ -246,7 +246,7 @@ func TestCircularMap(t *testing.T) {
 }
 
 func TestCircularSlice(t *testing.T) {
-	a := [][]interface{}{{nil}, {nil}}
+	a := [][]any{{nil}, {nil}}
 	a[0][0] = a[1]
 	a[1][0] = a[0][0]
 
@@ -265,8 +265,8 @@ func TestCircularSlice(t *testing.T) {
 }
 
 func TestCircularMapKey(t *testing.T) {
-	a := map[interface{}]interface{}{}
-	b := map[interface{}]interface{}{}
+	a := map[any]any{}
+	b := map[any]any{}
 	a[&b] = b
 	b[&a] = a
 
@@ -276,7 +276,7 @@ func TestCircularMapKey(t *testing.T) {
     (interface {})(nil)/* {{.a}} */: map[interface {}]interface {}{
         (interface {})(nil)/* {{.b}} */: gop.Circular().(map[interface {}]interface {}),
     },
-}`, map[string]interface{}{
+}`, map[string]any{
 		"a": fmt.Sprintf("0x%x", reflect.ValueOf(&a).Pointer()),
 		"b": fmt.Sprintf("0x%x", reflect.ValueOf(&b).Pointer()),
 	}))
@@ -287,10 +287,10 @@ func TestPlain(t *testing.T) {
 }
 
 func TestPlainMinify(t *testing.T) {
-	a := map[int]interface{}{
+	a := map[int]any{
 		1: "a",
 	}
-	b := map[int]interface{}{}
+	b := map[int]any{}
 	pa := gop.Plain(a)
 	pb := gop.Plain(b)
 	eq(t, pa, "map[int]interface {}{\n    1: \"a\",\n}")

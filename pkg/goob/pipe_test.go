@@ -44,7 +44,7 @@ func TestPipe(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(msgCount)
-		for i := 0; i < msgCount*2; i++ {
+		for i := range msgCount * 2 {
 			if i%2 == 0 {
 				go write(i)
 			} else {
@@ -59,7 +59,7 @@ func TestPipe(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(pipeCount)
-	for i := 0; i < pipeCount; i++ {
+	for range pipeCount {
 		go func() {
 			round()
 			wg.Done()
@@ -72,7 +72,7 @@ func TestPipeCancel(t *testing.T) {
 
 	const count = 1000
 
-	for i := 0; i < count; i++ {
+	for range count {
 		ctx, cancel := context.WithCancel(context.Background())
 		write, _ := goob.NewPipe(ctx)
 		go write(1)
@@ -89,9 +89,9 @@ func TestPipeMonkey(t *testing.T) {
 	round := 30
 	count := 10000
 
-	for i := 0; i < round; i++ {
+	for range round {
 		go func() {
-			for i := 0; i < count; i++ {
+			for i := range count {
 				write(i)
 			}
 		}()

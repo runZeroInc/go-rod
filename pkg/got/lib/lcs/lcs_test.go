@@ -22,7 +22,7 @@ func TestLCS(t *testing.T) {
 	check := func(i int, x, y string) {
 		t.Helper()
 
-		e := func(msg ...interface{}) {
+		e := func(msg ...any) {
 			t.Helper()
 			t.Log(i, x, y)
 			t.Error(msg...)
@@ -59,7 +59,7 @@ func TestLCS(t *testing.T) {
 	randStr := func() string {
 		const c = 8
 		b := make([]byte, c)
-		for i := 0; i < c; i++ {
+		for i := range c {
 			b[i] = byte('a' + g.RandInt(0, c))
 		}
 		return string(b)

@@ -896,7 +896,7 @@ func TestElementWait(t *testing.T) {
 	e1 := p.MustElement("body > ul > li")
 	g.Eq(e1.MustText(), "coffee")
 
-	params := []interface{}{1, 3, 4}
+	params := []any{1, 3, 4}
 	go func() {
 		utils.Sleep(0.3)
 		e1.MustEval(`(a, b, c) => this.innerText = 'x'.repeat(a + b + c)`, params...)

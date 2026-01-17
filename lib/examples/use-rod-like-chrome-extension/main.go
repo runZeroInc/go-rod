@@ -50,7 +50,7 @@ func linkPreviewer(browser *rod.Browser) {
 		page.MustEvalOnNewDocument(js)
 
 		// Expose a function to the page to provide preview
-		page.MustExpose("getPreview", func(url gson.JSON) (interface{}, error) {
+		page.MustExpose("getPreview", func(url gson.JSON) (any, error) {
 			p := pool.MustGet(create)
 			defer pool.Put(p)
 			p.MustNavigate(url.Str())

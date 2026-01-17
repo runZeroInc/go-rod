@@ -89,7 +89,7 @@ func New(opts ...launcher.BrowserOption) *Browser {
 	}
 }
 
-func defaultEFunc(args ...interface{}) {
+func defaultEFunc(args ...any) {
 	err, ok := args[len(args)-1].(error)
 	if ok {
 		panic(err)
@@ -269,7 +269,7 @@ func (b *Browser) Pages() (Pages, error) {
 }
 
 // Call implements the [proto.Client] to call raw cdp interface directly.
-func (b *Browser) Call(ctx context.Context, sessionID, methodName string, params interface{}) (res []byte, err error) {
+func (b *Browser) Call(ctx context.Context, sessionID, methodName string, params any) (res []byte, err error) {
 	res, err = b.client.Call(ctx, sessionID, methodName, params)
 	if err != nil {
 		return nil, err
@@ -354,7 +354,7 @@ func (b *Browser) PageFromTargetWithContext(ctx context.Context, targetID proto.
 }
 
 // EachEvent is similar to [Page.EachEvent], but catches events of the entire browser.
-func (b *Browser) EachEvent(callbacks ...interface{}) (wait func()) {
+func (b *Browser) EachEvent(callbacks ...any) (wait func()) {
 	return b.eachEvent("", callbacks...)
 }
 
@@ -389,7 +389,7 @@ func (b *Browser) waitEvent(sessionID proto.TargetSessionID, e proto.Event) (wai
 
 // If the any callback returns true the event loop will stop.
 // It will enable the related domains if not enabled, and restore them after wait ends.
-func (b *Browser) eachEvent(sessionID proto.TargetSessionID, callbacks ...interface{}) (wait func()) {
+func (b *Browser) eachEvent(sessionID proto.TargetSessionID, callbacks ...any) (wait func()) {
 	cbMap := map[string]reflect.Value{}
 	restores := []func(){}
 

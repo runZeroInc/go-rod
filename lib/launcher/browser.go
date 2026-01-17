@@ -1104,7 +1104,7 @@ func Open(url string) {
 func cleanZipFileName(baseDir string, fname string, depth int) (string, error) {
 	fname = strings.ReplaceAll(fname, "\\", "/")
 	bits := []string{}
-	for _, b := range strings.Split(fname, "/") {
+	for b := range strings.SplitSeq(fname, "/") {
 		if b == "" || b == "." || b == ".." {
 			continue
 		}

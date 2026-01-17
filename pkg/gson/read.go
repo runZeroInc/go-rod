@@ -15,7 +15,7 @@ import (
 // JSON represent a JSON value
 type JSON struct {
 	lock  *sync.Mutex
-	value *interface{}
+	value *any
 }
 
 // MarshalJSON interface
@@ -25,7 +25,7 @@ func (j JSON) MarshalJSON() ([]byte, error) {
 
 // Unmarshal is the same as [json.Unmarshal] for the underlying raw value.
 // It should be called before other operations.
-func (j JSON) Unmarshal(v interface{}) error {
+func (j JSON) Unmarshal(v any) error {
 	if j.value == nil {
 		return fmt.Errorf("gson: no value to unmarshal")
 	}
@@ -53,7 +53,7 @@ func (j JSON) JSON(prefix, indent string) string {
 }
 
 // Raw underlying value
-func (j JSON) Raw() interface{} {
+func (j JSON) Raw() any {
 	if j.value == nil {
 		return nil
 	}
@@ -78,14 +78,14 @@ func (j JSON) Has(path string) bool {
 }
 
 // Query section
-type Query func(interface{}) (val interface{}, has bool)
+type Query func(any) (val any, has bool)
 
 // Gets element by path sections. If a section is not string, int, or func, it will be ignored.
 // If it's a func, the value will be passed to it, the result of it will the next level.
 // The last return value will be false if not found.
-func (j JSON) Gets(sections ...interface{}) (JSON, bool) {
+func (j JSON) Gets(sections ...any) (JSON, bool) {
 	for _, sect := range sections {
-		var val interface{}
+		var val any
 		var has bool
 
 		if fn, ok := sect.(Query); ok {
@@ -102,7 +102,7 @@ func (j JSON) Gets(sections ...interface{}) (JSON, bool) {
 	return j, true
 }
 
-func get(objVal reflect.Value, sect interface{}) (val interface{}, has bool) {
+func get(objVal reflect.Value, sect any) (val any, has bool) {
 	switch k := sect.(type) {
 	case int:
 		if objVal.Kind() != reflect.Slice || k >= objVal.Len() {
@@ -140,7 +140,7 @@ func (j JSON) Str() string {
 	return fmt.Sprintf("%v", v)
 }
 
-var floatType = reflect.TypeOf(.0)
+var floatType = reflect.TypeFor[float64]()
 
 // Num value
 // returns zero value for type if underlying JSON type is not convertible.
@@ -166,7 +166,7 @@ func (j JSON) Nil() bool {
 	return j.Val() == nil
 }
 
-var intType = reflect.TypeOf(0)
+var intType = reflect.TypeFor[int]()
 
 // Int value
 // returns zero value for type if underlying JSON type is not convertible.
@@ -201,7 +201,7 @@ func (j JSON) Arr() []JSON {
 	if val.IsValid() && val.Kind() == reflect.Slice {
 		obj := []JSON{}
 		l := val.Len()
-		for i := 0; i < l; i++ {
+		for i := range l {
 			obj = append(obj, New(val.Index(i).Interface()))
 		}
 		return obj
@@ -224,9 +224,9 @@ func (j JSON) Join(sep string) string {
 var regIndex = regexp.MustCompile(`^0|([1-9]\d*)$`)
 
 // Path from string
-func Path(path string) []interface{} {
+func Path(path string) []any {
 	list := strings.Split(path, ".")
-	sects := make([]interface{}, len(list))
+	sects := make([]any, len(list))
 	for i, s := range list {
 		if regIndex.MatchString(s) {
 			index, err := strconv.ParseInt(s, 10, 64)

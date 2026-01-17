@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -531,13 +532,7 @@ func TestGetDefaultSystemChromeExecutables(t *testing.T) {
 	for _, tt := range tests {
 		got := launcher.GetDefaultSystemChromiumExecutables(tt.goos)
 		for _, want := range tt.expected {
-			found := false
-			for _, g := range got {
-				if g == want {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(got, want)
 			if !found {
 				t.Errorf("GOOS=%s: expected executable %q in list, got %v", tt.goos, want, got)
 			}

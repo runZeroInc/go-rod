@@ -15,7 +15,7 @@ import (
 
 type null struct{}
 
-func eq(t *testing.T, expected, actual interface{}) {
+func eq(t *testing.T, expected, actual any) {
 	if !reflect.DeepEqual(expected, actual) {
 		t.Error(expected, "not equal", actual)
 	}

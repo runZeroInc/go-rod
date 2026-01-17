@@ -96,7 +96,7 @@ func (q DOMQuad) Area() float64 {
 	area := 0.0
 	l := len(q)/2 - 1 //nolint: mnd
 
-	for i := 0; i < l; i++ {
+	for i := range l {
 		area += q[i*2]*q[i*2+3] - q[i*2+2]*q[i*2+1]
 	}
 	area += q[l*2]*q[1] - q[0]*q[l*2+1]

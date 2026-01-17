@@ -139,7 +139,7 @@ func VisualizeANSI(str string) string {
 //
 //	<d><a>1</><b>2</><c>3</d></><b>4</><a>5</>
 func FixNestedStyle(s string) string {
-	out := ""
+	var out strings.Builder
 	stacks := map[string][]string{}
 	i := 0
 	l := 0
@@ -154,7 +154,7 @@ func FixNestedStyle(s string) string {
 		l, r = i+loc[0], i+loc[1]
 		token := s[l:r]
 
-		out += s[i:l]
+		out.WriteString(s[i:l])
 
 		unset := GetStyle(token).Unset
 
@@ -169,18 +169,18 @@ func FixNestedStyle(s string) string {
 		stack := stacks[unset]
 		if len(stack) == 0 {
 			stack = append(stack, token)
-			out += token
+			out.WriteString(token)
 		} else {
 			if token == GetStyle(last(stack)).Unset {
-				out += token
+				out.WriteString(token)
 				stack = stack[:len(stack)-1]
 				if len(stack) > 0 {
-					out += last(stack)
+					out.WriteString(last(stack))
 				}
 			} else {
-				out += GetStyle(last(stack)).Unset
+				out.WriteString(GetStyle(last(stack)).Unset)
 				stack = append(stack, token)
-				out += token
+				out.WriteString(token)
 			}
 		}
 		stacks[unset] = stack
@@ -188,7 +188,7 @@ func FixNestedStyle(s string) string {
 		i = r
 	}
 
-	return out + s[i:]
+	return out.String() + s[i:]
 }
 
 // GetStyle from available styles

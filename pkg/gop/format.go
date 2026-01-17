@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -49,13 +50,13 @@ var ThemeNone = func(t Type) []Style {
 }
 
 // F is a shortcut for Format with color
-func F(v interface{}) string {
+func F(v any) string {
 	return Format(Tokenize(v), ThemeDefault)
 }
 
 // P pretty print the values
-func P(values ...interface{}) error {
-	list := []interface{}{}
+func P(values ...any) error {
+	list := []any{}
 	for _, v := range values {
 		list = append(list, F(v))
 	}
@@ -72,7 +73,7 @@ func P(values ...interface{}) error {
 }
 
 // Plain is a shortcut for Format with plain color
-func Plain(v interface{}) string {
+func Plain(v any) string {
 	return Format(Tokenize(v), ThemeNone)
 }
 
@@ -117,12 +118,7 @@ func Format(ts []*Token, theme Theme) string {
 }
 
 func oneOf(t Type, list ...Type) bool {
-	for _, el := range list {
-		if t == el {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, t)
 }
 
 // To make multi-line string block more human readable.

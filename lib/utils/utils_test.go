@@ -24,15 +24,15 @@ func TestNoop(_ *testing.T) {
 func TestTestLog(t *testing.T) {
 	g := setup(t)
 
-	var res []interface{}
-	lg := utils.Log(func(msg ...interface{}) { res = append(res, msg[0]) })
+	var res []any
+	lg := utils.Log(func(msg ...any) { res = append(res, msg[0]) })
 	lg.Println("ok")
 	g.Eq(res[0], "ok")
 
 	utils.LoggerQuiet.Println()
 
 	utils.MultiLogger(lg, lg).Println("ok")
-	g.Eq(res, []interface{}{"ok", "ok", "ok"})
+	g.Eq(res, []any{"ok", "ok", "ok"})
 }
 
 func TestTestE(t *testing.T) {

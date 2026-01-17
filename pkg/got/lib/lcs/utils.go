@@ -4,13 +4,6 @@ import (
 	"strings"
 )
 
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 func eq(x, y Comparable) bool {
 	return x.String() == y.String()
 }
@@ -26,11 +19,11 @@ func (xs Sequence) String() string {
 		l += len(el.String())
 	}
 	if l == len(xs) {
-		out := ""
+		var out strings.Builder
 		for _, c := range xs {
-			out += c.String()
+			out.WriteString(c.String())
 		}
-		return out
+		return out.String()
 	}
 
 	out := []string{}

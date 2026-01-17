@@ -22,7 +22,7 @@ func TestAssertion(t *testing.T) {
 	as.Eq(nil, nil)
 	as.Eq(map[int]int(nil), nil)
 	fn := func() {}
-	as.Eq(map[int]interface{}{1: fn, 2: nil}, map[int]interface{}{2: nil, 1: fn})
+	as.Eq(map[int]any{1: fn, 2: nil}, map[int]any{2: nil, 1: fn})
 	as.Eq((*int)(nil), nil)
 
 	as.Neq(1.1, 1)

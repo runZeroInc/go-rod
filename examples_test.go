@@ -595,11 +595,9 @@ func ExamplePage_pool() {
 	// Run jobs concurrently
 	wg := sync.WaitGroup{}
 	for range "...." {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			yourJob()
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -626,10 +624,8 @@ func ExampleBrowser_pool() {
 
 	// Use the browser instances in separate goroutines
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 3 {
+		wg.Go(func() {
 
 			// Get a browser instance from the pool
 			browser := pool.MustGet(create)
@@ -641,7 +637,7 @@ func ExampleBrowser_pool() {
 			// Use the browser instance
 			page := browser.MustPage("https://www.google.com")
 			fmt.Println(page.MustInfo().Title)
-		}()
+		})
 	}
 
 	// Wait for all the goroutines to finish
@@ -678,7 +674,7 @@ func Example_load_extension() {
 func Example_log_cdp_traffic() {
 	cdp := cdp.New().
 		// Here we can customize how to log the requests, responses, and events transferred between Rod and the browser.
-		Logger(utils.Log(func(args ...interface{}) {
+		Logger(utils.Log(func(args ...any) {
 			switch v := args[0].(type) {
 			case *cdp.Request:
 				fmt.Printf("id: %d", v.ID)

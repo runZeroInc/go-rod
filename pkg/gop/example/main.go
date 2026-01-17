@@ -8,12 +8,12 @@ import (
 )
 
 func main() {
-	val := map[string]interface{}{
+	val := map[string]any{
 		"bool":   true,
 		"number": 1 + 1i,
 		"bytes":  []byte{97, 98, 99},
 		"lines":  "multiline string\nline two",
-		"slice":  []interface{}{1, 2},
+		"slice":  []any{1, 2},
 		"time":   time.Now(),
 		"chan":   make(chan int, 1),
 		"struct": struct{ test int32 }{
@@ -22,7 +22,7 @@ func main() {
 		"json": `{"a"   : 1}`,
 		"func": func(int) int { return 0 },
 	}
-	val["slice"].([]interface{})[1] = val["slice"]
+	val["slice"].([]any)[1] = val["slice"]
 
 	_ = gop.P(val)
 }

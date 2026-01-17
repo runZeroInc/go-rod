@@ -30,48 +30,48 @@ type Utils struct {
 }
 
 // Fatal is the same as [testing.common.Fatal]
-func (ut Utils) Fatal(args ...interface{}) {
+func (ut Utils) Fatal(args ...any) {
 	ut.Helper()
 	ut.Log(args...)
 	ut.FailNow()
 }
 
 // Fatalf is the same as [testing.common.Fatalf]
-func (ut Utils) Fatalf(format string, args ...interface{}) {
+func (ut Utils) Fatalf(format string, args ...any) {
 	ut.Helper()
 	ut.Logf(format, args...)
 	ut.FailNow()
 }
 
 // Log is the same as [testing.common.Log]
-func (ut Utils) Log(args ...interface{}) {
+func (ut Utils) Log(args ...any) {
 	ut.Helper()
 	ut.Logf("%s", fmt.Sprintln(args...))
 }
 
 // Error is the same as [testing.common.Error]
-func (ut Utils) Error(args ...interface{}) {
+func (ut Utils) Error(args ...any) {
 	ut.Helper()
 	ut.Log(args...)
 	ut.Fail()
 }
 
 // Errorf is the same as [testing.common.Errorf]
-func (ut Utils) Errorf(format string, args ...interface{}) {
+func (ut Utils) Errorf(format string, args ...any) {
 	ut.Helper()
 	ut.Logf(format, args...)
 	ut.Fail()
 }
 
 // Skipf is the same as [testing.common.Skipf]
-func (ut Utils) Skipf(format string, args ...interface{}) {
+func (ut Utils) Skipf(format string, args ...any) {
 	ut.Helper()
 	ut.Logf(format, args...)
 	ut.SkipNow()
 }
 
 // Skip is the same as [testing.common.Skip]
-func (ut Utils) Skip(args ...interface{}) {
+func (ut Utils) Skip(args ...any) {
 	ut.Helper()
 	ut.Log(args...)
 	ut.SkipNow()
@@ -170,7 +170,7 @@ func (ut Utils) RandBytes(l int) []byte {
 }
 
 // Render template. It will use [Utils.Read] to read the value as the template string.
-func (ut Utils) Render(value interface{}, data interface{}) *bytes.Buffer {
+func (ut Utils) Render(value any, data any) *bytes.Buffer {
 	ut.Helper()
 	out := bytes.NewBuffer(nil)
 	t := template.New("")
@@ -181,7 +181,7 @@ func (ut Utils) Render(value interface{}, data interface{}) *bytes.Buffer {
 }
 
 // WriteFile at path with content, it uses [Utils.Open] to open the file.
-func (ut Utils) WriteFile(path string, content interface{}) {
+func (ut Utils) WriteFile(path string, content any) {
 	f := ut.Open(true, path)
 	defer func() { ut.err(f.Close()) }()
 	ut.Write(content)(f)
@@ -255,7 +255,7 @@ func (ut Utils) Open(create bool, path string) (f *os.File) {
 // the file content will be read, or the string will be returned.
 // If the value is [io.Reader], the reader will be read. If the value is []byte, the value will be returned.
 // Others will be converted to string and returned.
-func (ut Utils) Read(value interface{}) *bytes.Buffer {
+func (ut Utils) Read(value any) *bytes.Buffer {
 	ut.Helper()
 
 	var r io.Reader
@@ -283,7 +283,7 @@ func (ut Utils) Read(value interface{}) *bytes.Buffer {
 }
 
 // JSON from string, []byte, or io.Reader
-func (ut Utils) JSON(src interface{}) (v interface{}) {
+func (ut Utils) JSON(src any) (v any) {
 	ut.Helper()
 
 	var b []byte
@@ -302,7 +302,7 @@ func (ut Utils) JSON(src interface{}) (v interface{}) {
 }
 
 // ToJSON convert obj to JSON bytes
-func (ut Utils) ToJSON(obj interface{}) *bytes.Buffer {
+func (ut Utils) ToJSON(obj any) *bytes.Buffer {
 	ut.Helper()
 	b, err := json.MarshalIndent(obj, "", "  ")
 	ut.err(err)
@@ -310,14 +310,14 @@ func (ut Utils) ToJSON(obj interface{}) *bytes.Buffer {
 }
 
 // ToJSONString convert obj to JSON string
-func (ut Utils) ToJSONString(obj interface{}) string {
+func (ut Utils) ToJSONString(obj any) string {
 	ut.Helper()
 	return ut.ToJSON(obj).String()
 }
 
 // Write obj to the writer. Encode obj to []byte and cache it for writer.
 // If obj is not []byte, string, or [io.Reader], it will be encoded as JSON.
-func (ut Utils) Write(obj interface{}) (writer func(io.Writer)) {
+func (ut Utils) Write(obj any) (writer func(io.Writer)) {
 	lock := sync.Mutex{}
 	var cache []byte
 	return func(w io.Writer) {

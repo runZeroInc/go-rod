@@ -22,7 +22,7 @@ type Skip struct{}
 //
 // If iteratee is Ctx, its G field will be set to New(t) for each test.
 // Any Fn that has the same name with the embedded one will be ignored.
-func Each(t Testable, iteratee interface{}) (count int) {
+func Each(t Testable, iteratee any) (count int) {
 	t.Helper()
 
 	itVal := normalizeIteratee(t, iteratee)
@@ -52,7 +52,7 @@ func Each(t Testable, iteratee interface{}) (count int) {
 	return
 }
 
-func normalizeIteratee(t Testable, iteratee interface{}) reflect.Value {
+func normalizeIteratee(t Testable, iteratee any) reflect.Value {
 	t.Helper()
 
 	if iteratee == nil {
@@ -136,7 +136,7 @@ func filterMethods(typ reflect.Type) []reflect.Method {
 			continue
 		}
 
-		if method.Type.NumIn() > 1 && method.Type.In(1) == reflect.TypeOf(Only{}) {
+		if method.Type.NumIn() > 1 && method.Type.In(1) == reflect.TypeFor[Only]() {
 			onlyList = append(onlyList, method)
 		}
 
@@ -151,7 +151,7 @@ func filterMethods(typ reflect.Type) []reflect.Method {
 }
 
 func doSkip(t Testable, method reflect.Method) {
-	if method.Type.NumIn() > 1 && method.Type.In(1) == reflect.TypeOf(Skip{}) {
+	if method.Type.NumIn() > 1 && method.Type.In(1) == reflect.TypeFor[Skip]() {
 		t.SkipNow()
 	}
 }

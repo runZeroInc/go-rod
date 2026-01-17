@@ -24,8 +24,7 @@ func rename() {
 
 		cmd("gopls -remote auto rename -w " + pType + " T")
 
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			for _, p := range cmd("gopls -remote auto references " + pType) {
 				if strings.Contains(p, "definitions_test.go") {
 					continue
@@ -34,8 +33,7 @@ func rename() {
 				pRef := repose(p, 0, -2)
 				cmd("gopls -remote auto rename -w " + pRef + " t")
 			}
-			wg.Done()
-		}()
+		})
 	}
 	wg.Wait()
 }

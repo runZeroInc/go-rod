@@ -21,7 +21,8 @@ func main() {
 
 	cleanup()
 
-	init := comment + utils.S(`
+	var init strings.Builder
+	init.WriteString(comment + utils.S(`
 
 		package proto
 
@@ -34,7 +35,7 @@ func main() {
 		const Version = "v{{.major}}.{{.minor}}"
 
 		var types = map[string]reflect.Type{
-	`, "major", schema.Get("version.major").Str(), "minor", schema.Get("version.minor").Str())
+	`, "major", schema.Get("version.major").Str(), "minor", schema.Get("version.minor").Str()))
 
 	testsCode := comment + `
 
@@ -71,11 +72,11 @@ func main() {
 			testsCode += definition.formatTests()
 
 			if definition.originName != "" {
-				init += utils.S(`
+				init.WriteString(utils.S(`
 					"{{.name}}": reflect.TypeOf({{.type}}{}),`,
 					"name", definition.domain.name+"."+definition.originName,
 					"type", definition.name,
-				)
+				))
 			}
 		}
 
@@ -85,11 +86,11 @@ func main() {
 			code))
 	}
 
-	init += `
+	init.WriteString(`
 		}
-	`
+	`)
 
-	utils.E(utils.OutputFile(filepath.FromSlash("lib/proto/definitions.go"), init))
+	utils.E(utils.OutputFile(filepath.FromSlash("lib/proto/definitions.go"), init.String()))
 	utils.E(utils.OutputFile(filepath.FromSlash("lib/proto/definitions_test.go"), testsCode))
 
 	path := "./lib/proto"
