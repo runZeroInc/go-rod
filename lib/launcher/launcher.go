@@ -49,7 +49,7 @@ var DefaultExecFlags = map[string][]string{
 		"site-per-process", // See https://github.com/puppeteer/puppeteer/issues/2548
 		"TranslateUI",
 		"OptimizationGuideModelDownloading", "OptimizationHintsFetching", "OptimizationTargetPrediction", "OptimizationHints",
-		// "NetworkService", "NetworkServiceInProcess",
+		//"NetworkService", "NetworkServiceInProcess",
 	},
 
 	"allow-chrome-scheme-url":                            nil, // Allow chrome:// URLs in headless mode
@@ -58,7 +58,7 @@ var DefaultExecFlags = map[string][]string{
 	"disable-background-networking":                      nil,
 	"disable-background-timer-throttling":                nil,
 	"disable-backgrounding-occluded-windows":             nil,
-	"disable-breakpad":                                   nil, // prevent crash dumps: https://github.com/runZeroInc/platform/issues/19900
+	"disable-breakpad":                                   nil, // Slightly silences crash dumps: https://github.com/runZeroInc/platform/issues/19900
 	"disable-client-side-phishing-detection":             nil,
 	"disable-component-extensions-with-background-pages": nil,
 	"disable-component-update":                           nil,
@@ -80,7 +80,6 @@ var DefaultExecFlags = map[string][]string{
 	"disable-translate":                                  nil,
 	"enable-automation":                                  nil,
 	"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
-	"enable-logging":                                     {"stderr"},
 	"export-tagged-pdf":                                  nil,
 	"force-color-profile":                                {"srgb"},
 	"generate-pdf-document-outline":                      nil,
@@ -93,6 +92,8 @@ var DefaultExecFlags = map[string][]string{
 	"password-store":                                     {"basic"},
 	"safebrowsing-disable-auto-update":                   nil,
 	"use-mock-keychain":                                  nil, // Avoid macOS keychain prompts
+	"enable-logging":                                     {"stderr"},
+	"v":                                                  {"1"},
 	"log-level":                                          {"1"},
 }
 

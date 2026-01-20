@@ -84,8 +84,9 @@ func (l *Launcher) ensureUserPermissions(userDir, binPath string) error {
 	return res
 }
 
+// osEnsureUserPermissionsBinary ensures that the binary and its leading paths
+// have execute permissions for user, group, and other.
 func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
-	// Validate bin path
 	if binPath == "" {
 		return fmt.Errorf("no binary path")
 	}
@@ -108,13 +109,24 @@ func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 		return fmt.Errorf("bin path %s: %w", binPath, err)
 	}
 
+	// Try to ensure all leading paths are read/execute
+	if err := l.osEnsureLeadingPathReadExec(binPath); err != nil {
+		return fmt.Errorf("leading path read/exec %s: %w", binPath, err)
+	}
+
+	return nil
+}
+
+// osEnsureLeadingPathReadExec ensures that all components of the
+// path allow read and execute permissions for user, group, and other.
+func (l *Launcher) osEnsureLeadingPathReadExec(src string) error {
 	// Ensure that all leading paths have execute enabled for user, group, and other
-	base, err := filepath.Abs(filepath.Dir(binPath))
+	base, err := filepath.Abs(src)
 	if err != nil {
-		return fmt.Errorf("resolve base path %s: %w", binPath, err)
+		return fmt.Errorf("resolve base path %s: %w", src, err)
 	}
 	pname := "/"
-	for _, part := range strings.Split(base, string(filepath.Separator)) {
+	for part := range strings.SplitSeq(base, string(filepath.Separator)) {
 		if part == "" {
 			continue
 		}
@@ -123,15 +135,15 @@ func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 		if err != nil {
 			return fmt.Errorf("stat path %s: %w", pname, err)
 		}
+		// We've reached the file at the end of the path
 		if !st.IsDir() {
-			return fmt.Errorf("path %s is not a directory", pname)
+			return nil
 		}
 		cperm := st.Mode().Perm()
 		if err := os.Chmod(pname, cperm|0o111); err != nil { //nolint:gosec
 			l.logger.Errorf("failed to chmod path %s as %o: %s", pname, cperm|0o111, err)
 		}
 	}
-
 	return nil
 }
 
@@ -166,6 +178,12 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 	if err != nil {
 		return fmt.Errorf("userdir path %s: %w", userDir, err)
 	}
+
+	// Try to ensure all leading paths are read/execute
+	if err := l.osEnsureLeadingPathReadExec(userDir); err != nil {
+		return fmt.Errorf("leading path read/exec %s: %w", userDir, err)
+	}
+
 	return nil
 }
 

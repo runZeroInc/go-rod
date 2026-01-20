@@ -29,6 +29,8 @@ type osAttributes struct {
 	Sudo     bool
 }
 
+// osPreferredUsernames is the list of preferred non-SYSTEM accounts to attempt to sudo to
+// when running as SYSTEM under a service.
 var osPreferredUsernames = []string{
 	"NT AUTHORITY\\NetworkService",
 	"NT AUTHORITY\\LocalService",
@@ -43,6 +45,9 @@ var (
 	RestrictedAppPackagesUsername = "APPLICATION PACKAGE AUTHORITY\\ALL RESTRICTED APPLICATION PACKAGES"
 	AllAppPackagesSID, _          = windows.StringToSid("S-1-15-2-1")
 	AllAppPackagesUsername        = "APPLICATION PACKAGE AUTHORITY\\ALL APPLICATION PACKAGES"
+	EveryoneSID, _                = windows.StringToSid("S-1-1-0")
+	CreatorOwnerSID, _            = windows.StringToSid("S-1-3-0")
+	CreatorGroupSID, _            = windows.StringToSid("S-1-3-1")
 )
 
 func (l *Launcher) osResolveAttributes() {
@@ -64,7 +69,8 @@ func (l *Launcher) osResolveAttributes() {
 	for _, v := range osPreferredUsernames {
 		dom, user, found := strings.Cut(v, "\\")
 		if !found {
-			continue
+			user = v
+			dom = "."
 		}
 		// Note that Microsoft Edge will still timeout if this code is run as system and gets a valid token
 		// when it is NOT running as a service. It will still obtain the token, but Edge will not start
@@ -105,9 +111,10 @@ func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 	if binPath == "" {
 		return fmt.Errorf("no binary path")
 	}
-	// Set read/exec permissions on the binary path
-	_ = winacl.Chmod(binPath, 0o755)
-	winacl.Apply(binPath, false, true, api.ExplicitAccess{})
+	err := GrantReadExecToPackages(binPath)
+	if err != nil {
+		l.logger.Errorf("grant read/exec to packages on binary %s: %v", binPath, err)
+	}
 	return nil
 }
 
@@ -116,10 +123,21 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 		return fmt.Errorf("no user-data-dir")
 	}
 
+	// Grant read/execute to LPAC
+	if err := GrantReadExecToPackages(l.Browser.TempDir); err != nil {
+		l.logger.Errorf("grant read/exec to packages on temp dir %s failed: %v", l.Browser.TempDir, err)
+	}
+	if err := GrantReadExecToPackages(l.Browser.CacheDir); err != nil {
+		l.logger.Errorf("grant read/exec to packages on cache dir %s failed: %v", l.Browser.CacheDir, err)
+	}
+	if err := GrantReadExecToPackages(userDir); err != nil {
+		l.logger.Errorf("grant read/exec to packages on user dir %s failed: %v", userDir, err)
+	}
+
+	// If we're sudoing to another user, change the ownership of the user dir
 	if l.osAttributes.Username == "" {
 		return nil
 	}
-
 	st, err := os.Stat(userDir)
 	if err != nil {
 		return fmt.Errorf("userdir %s: %w", userDir, err)
@@ -128,14 +146,14 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 		return fmt.Errorf("userdir %s is not a directory", userDir)
 	}
 
+	// Change the ownership to the target user account
 	var errSet error
 	if err := ChownByUsername(l.Browser.TempDir, l.osAttributes.Username); err != nil {
-		l.logger.Errorf("chown temp dir %s for user %s failed: %v", l.Browser.TempDir, l.osAttributes.Username, err)
+		l.logger.Errorf("chown temp dir %q for user %s failed: %v", l.Browser.TempDir, l.osAttributes.Username, err)
 		errSet = err
 	}
-
 	if err := ChownByUsername(userDir, l.osAttributes.Username); err != nil {
-		l.logger.Errorf("chown user dir %s for user %s failed: %v", userDir, l.osAttributes.Username, err)
+		l.logger.Errorf("chown user dir %q for user %s failed: %v", userDir, l.osAttributes.Username, err)
 		errSet = errors.Join(errSet, err)
 	}
 
@@ -146,13 +164,17 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 	for _, part := range crashPadParts {
 		bpath = filepath.Join(bpath, part)
 		if err := os.MkdirAll(bpath, 0o755); err != nil { //nolint:gosec
-			l.logger.Errorf("mkdir %s for user %s failed: %v", bpath, l.osAttributes.Username, err)
+			l.logger.Errorf("mkdir %q for user %s failed: %v", bpath, l.osAttributes.Username, err)
 		}
 		if err := ChownByUsername(bpath, l.osAttributes.Username); err != nil {
-			l.logger.Errorf("chown %s for user %s failed: %v", bpath, l.osAttributes.Username, err)
+			l.logger.Errorf("chown %q for user %s failed: %v", bpath, l.osAttributes.Username, err)
 			errSet = errors.Join(errSet, err)
 		}
+		if err := GrantReadExecToPackages(bpath); err != nil {
+			l.logger.Errorf("grant read/exec to packages on path %s failed: %v", bpath, err)
+		}
 	}
+
 	return errSet
 }
 
@@ -201,15 +223,20 @@ func ChownByUsername(path string, username string) error {
 }
 
 func GrantReadExecToPackages(path string) error {
-	_ = winacl.Chmod(path, 0o755)
-	return winacl.Apply(path, false, true,
-		winacl.GrantName(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, AllAppPackagesUsername),
+	if _, err := os.Stat(path); err != nil {
+		// Skip non-existent paths
+		return nil
+	}
+	// Give everyone read/execute (LPAC explicitly) and make sure the owner has maximum allowed
+	return winacl.Apply(path, false, false,
 		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, AllAppPackagesSID),
-		winacl.GrantName(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, RestrictedAppPackagesUsername),
 		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, RestrictedAppPackagesSID),
+		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, EveryoneSID),
+		winacl.GrantSid(windows.MAXIMUM_ALLOWED, CreatorOwnerSID),
 	)
 }
 
+// getCurrentProcessTokenUser retrieves the username, domain, and SID of the current process token
 func getCurrentProcessTokenUser() (string, string, *windows.SID, error) {
 	var token windows.Token
 	// Get the current process token

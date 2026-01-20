@@ -112,18 +112,15 @@ func newTester() *G {
 func setup(t *testing.T) G {
 	t.Helper()
 
-	if got.Parallel() != 1 {
-		t.Parallel()
-	}
-
 	tester := testerPool.MustGet(newTester)
 	t.Cleanup(func() { testerPool.Put(tester) })
+
+	tester.G = got.New(t)
+	tester.mc.t = t
 
 	logr := logrus.New()
 	logr.Out = tester.Open(true, filepath.Join(LogDir, tester.mc.id, t.Name()+".log"))
 	tester.mc.log = logrus.NewEntry(logr)
-	tester.G = got.New(t)
-	tester.mc.t = t
 	tester.page.MustNavigate("")
 
 	return *tester
