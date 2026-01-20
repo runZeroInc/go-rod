@@ -69,6 +69,7 @@ type Webshot struct {
 	Timeout              time.Duration
 	Width                int
 	Height               int
+	DeviceScaleFactor    float64
 	Fullpage             bool
 	MinCaptures          int
 	MaxCaptures          int
@@ -127,6 +128,7 @@ func NewWebshot(options ...WebshotOption) *Webshot {
 		MinCaptures:         MinCapturesDefault,
 		LaunchTimeout:       time.Minute,
 		MaxCaptures:         8,
+		DeviceScaleFactor:   1,
 	}
 	for _, opt := range options {
 		opt(w)
@@ -157,6 +159,12 @@ func WithDimensions(width, height int) WebshotOption {
 	return func(w *Webshot) {
 		w.Width = width
 		w.Height = height
+	}
+}
+
+func WithDeviceScaleFactor(factor float64) WebshotOption {
+	return func(w *Webshot) {
+		w.DeviceScaleFactor = factor
 	}
 }
 
@@ -463,6 +471,13 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 		w.Stats.Failures.Add(1)
 		return nil, fmt.Errorf("page: %w", err)
 	}
+	defer page.Close()
+
+	page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+		Width:             w.Width,
+		Height:            w.Height,
+		DeviceScaleFactor: w.DeviceScaleFactor,
+	})
 
 	// Navigate to the target URL
 	if err = page.Navigate(url); err != nil {
@@ -470,9 +485,16 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 		return nil, fmt.Errorf("navigate: %w", err)
 	}
 
+	// Wait for the page to load
+	page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
+
+	// Move the mouse a bit to try and trigger any lazy rendering
+	_ = page.Mouse.MoveTo(proto.Point{X: float64(rand.IntN(w.Width)), Y: float64(rand.IntN(w.Height))}) //nolint:gosec
+
 	var bestCap []byte
 	var buf []byte
 
+	// Try multiple times to get the best screenshot, using the largest image as the best candidate
 	captures := 0
 	for i := 0; i < w.MaxCaptures; i++ {
 		if i > 0 {
@@ -495,9 +517,6 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 			Milliseconds: int64(time.Since(stime) / time.Millisecond),
 			Error:        err,
 		})
-
-		// Move the mouse about randomly to try and trigger any lazy rendering
-		_ = page.Mouse.MoveTo(proto.Point{X: float64(rand.IntN(w.Width)), Y: float64(rand.IntN(w.Height))}) //nolint:gosec
 
 		if err != nil {
 			break
