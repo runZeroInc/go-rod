@@ -86,7 +86,7 @@ func test(at archType) {
 }
 
 func login() {
-	cmd := exec.Command("docker", "login", "-u=rod-robot", "-p", os.Getenv("GITHUB_TOKEN"), registry)
+	cmd := exec.Command("docker", "login", "-u=rod-robot", "-p", os.Getenv("GITHUB_TOKEN"), registry) //nolint:gosec
 	out, err := cmd.CombinedOutput()
 	utils.E(err)
 	utils.E(os.Stdout.Write(out))
@@ -134,27 +134,27 @@ func (at archType) platform() string {
 func (at archType) tag() string {
 	switch at {
 	case archArm:
-		return registry + ":arm"
+		return strings.ToLower(registry + ":arm")
 	default:
-		return registry + ":amd"
+		return strings.ToLower(registry + ":amd")
 	}
 }
 
 func (at archType) tagDev() string {
 	switch at {
 	case archArm:
-		return registry + ":arm-dev"
+		return strings.ToLower(registry + ":arm-dev")
 	default:
-		return registry + ":amd-dev"
+		return strings.ToLower(registry + ":amd-dev")
 	}
 }
 
 func (at archType) golang() string {
 	switch at {
 	case archArm:
-		return "https://go.dev/dl/go1.19.1.linux-arm64.tar.gz"
+		return "https://go.dev/dl/go1.25.6.linux-arm64.tar.gz"
 	default:
-		return "https://go.dev/dl/go1.19.1.linux-amd64.tar.gz"
+		return "https://go.dev/dl/go1.25.6.linux-amd64.tar.gz"
 	}
 }
 
