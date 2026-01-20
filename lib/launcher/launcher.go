@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -32,7 +31,7 @@ const DefaultLaunchTimeout = time.Minute * 3
 // have been disabled and AppArmor profiles must be used instead.
 var ErrNoSandbox = errors.New("sandbox must be disabled")
 
-// DefaultUserDataDirPrefix ...
+// DefaultUserDataDirPrefix is the default prefix for temporary user data dirs.
 var DefaultUserDataDirPrefix = filepath.Join(os.TempDir(), "go-rod-user-data")
 
 var DefaultExecFlags = map[string][]string{
@@ -128,13 +127,23 @@ func New(opts ...BrowserOption) (*Launcher, error) {
 		return nil, fmt.Errorf("mktemp user data dir %s: %w", profileDir, err)
 	}
 
-	// Set the userdata-dir flag and the corresponding env variable
+	// Convert the profile dir to an absolute path.
+	profileDir, err = filepath.Abs(profileDir)
+	if err != nil {
+		_ = os.RemoveAll(profileDir)
+		return nil, fmt.Errorf("resolve profile dir %s: %w", profileDir, err)
+	}
+
+	// Chrome requires forward slashes in the paths for some parameters on Windows
+	profileDirSlash := filepath.ToSlash(profileDir)
+
+	// Set the userdata-dir flag and the corresponding env variable to the slash version
 	execFlags := GetExecFlags(conf)
-	execFlags[flags.UserDataDir] = []string{profileDir}
+	execFlags[flags.UserDataDir] = []string{profileDirSlash}
 
 	// If a custom environment is set, override the user data dir related variables
 	if conf.WithEnv != nil {
-		conf.WithEnv["CHROME_USER_DATA_DIR"] = profileDir
+		conf.WithEnv["CHROME_USER_DATA_DIR"] = profileDirSlash
 		conf.WithEnv["TMP"] = profileDir
 		conf.WithEnv["TEMP"] = profileDir
 		conf.WithEnv["TMPDIR"] = profileDir
@@ -517,20 +526,18 @@ func (l *Launcher) StartURL(u string) *Launcher {
 // FormatArgs returns the formatted arg list for cli.
 func (l *Launcher) FormatArgs() ([]string, error) {
 	execArgs := []string{}
+
+	// Ensure that --user-data-dir is the first flag
+	userDataDir := l.Get(flags.UserDataDir)
+	if userDataDir != "" {
+		delete(l.Flags, flags.UserDataDir)
+		execArgs = append(execArgs, "--user-data-dir="+userDataDir)
+	}
+	// Append the rest of the flags
 	for k, v := range l.Flags {
 		if k == flags.Arguments {
 			continue
 		}
-
-		// fix a bug of chrome, if path is not absolute chrome will hang
-		if k == flags.UserDataDir {
-			abs, err := filepath.Abs(v[0])
-			if err != nil {
-				return execArgs, fmt.Errorf("failed to resolve profile dir %s: %v", v[0], err)
-			}
-			v[0] = abs
-		}
-
 		str := "--" + string(k)
 		if v != nil {
 			str += "=" + strings.Join(v, ",")
@@ -539,7 +546,6 @@ func (l *Launcher) FormatArgs() ([]string, error) {
 	}
 
 	execArgs = append(execArgs, l.Flags[flags.Arguments]...)
-	sort.Strings(execArgs)
 	return execArgs, nil
 }
 

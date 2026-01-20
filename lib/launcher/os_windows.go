@@ -57,7 +57,7 @@ func (l *Launcher) osResolveAttributes() {
 
 	// Return early if the current user is not SYSTEM
 	if strings.EqualFold(l.osAttributes.Username, "NT AUTHORITY\\SYSTEM") == false {
-		l.logger.Debugf("not running as system, skipping sudo (%s\\%s)", dom, user)
+		l.logger.Debugf("running as %s and skipping sudo", l.osAttributes.Username)
 		return
 	}
 
