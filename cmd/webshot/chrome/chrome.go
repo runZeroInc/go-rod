@@ -480,13 +480,13 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 	})
 
 	// Navigate to the target URL
+	waitForNav := page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
 	if err = page.Navigate(url); err != nil {
 		w.Stats.Failures.Add(1)
 		return nil, fmt.Errorf("navigate: %w", err)
 	}
 
 	// Wait for the page to load
-	waitForNav := page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
 	waitForNav()
 
 	// Move the mouse a bit to try and trigger any lazy rendering
