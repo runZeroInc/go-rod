@@ -96,10 +96,6 @@ func main() {
 	path := "./lib/proto"
 	utils.Exec("gofumpt -w", path)
 	utils.Exec("go run golang.org/x/tools/cmd/goimports@latest -w", path)
-	utils.Exec(
-		"go run github.com/runZeroInc/go-rod/pkg/golangci-lint@latest -- run --fix",
-		path,
-	)
 }
 
 func (d *definition) comment() string {

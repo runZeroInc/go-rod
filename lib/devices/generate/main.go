@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/runZeroInc/go-rod/lib/utils"
@@ -63,13 +62,7 @@ func main() {
 
 	path := "./lib/devices/list.go"
 	utils.E(utils.OutputFile(path, code))
-
 	utils.Exec("gofumpt -w", path)
-	utils.Exec(
-		"go run github.com/runZeroInc/go-rod/pkg/golangci-lint@latest -- "+
-			"run --fix",
-		filepath.Dir(path),
-	)
 }
 
 func getDeviceList() gson.JSON {
