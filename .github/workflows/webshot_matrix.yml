@@ -25,7 +25,8 @@ jobs:
       with:
         go-version-file: go.mod
         check-latest: true
-
+        cache: true
+  
     - name: Install dependencies
       run: go get -v ./...
 
