@@ -526,21 +526,17 @@ func (l *Launcher) StartURL(u string) *Launcher {
 // FormatArgs returns the formatted arg list for cli.
 func (l *Launcher) FormatArgs() ([]string, error) {
 	execArgs := []string{}
-
-	// Ensure that --user-data-dir is the first flag
-	userDataDir := l.Get(flags.UserDataDir)
-	if userDataDir != "" {
-		delete(l.Flags, flags.UserDataDir)
-		execArgs = append(execArgs, "--user-data-dir="+userDataDir)
-	}
-	// Append the rest of the flags
 	for k, v := range l.Flags {
 		if k == flags.Arguments {
-			continue
 		}
 		str := "--" + string(k)
 		if v != nil {
 			str += "=" + strings.Join(v, ",")
+		}
+		// Ensure that --user-data-dir is the first flag
+		if k == flags.UserDataDir {
+			execArgs = append([]string{str}, execArgs...)
+			continue
 		}
 		execArgs = append(execArgs, str)
 	}

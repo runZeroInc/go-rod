@@ -3,6 +3,7 @@
 package launcher
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
+
+	"github.com/runZeroInc/go-rod/lib/launcher/flags"
 )
 
 type osAttributes struct {
@@ -26,6 +31,16 @@ func (l *Launcher) osResolveAttributes() {
 
 func (l *Launcher) osSetupCmd(ctx context.Context, cmd *exec.Cmd) error {
 	var err error
+
+	// Automatically add --no-sandbox if unprivileged user namespaces are disabled on Linux
+	if _, nsb := l.GetFlags(flags.NoSandbox); runtime.GOOS == "linux" && !nsb {
+		unsDisabled, err := os.ReadFile("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+		if err == nil && bytes.HasPrefix(unsDisabled, []byte("1")) {
+			l.logger.Debugf("automatically adding the --no-sandbox flag since unprivileged user namespaces are disabled")
+			cmd.Args = append(cmd.Args, "--no-sandbox")
+		}
+	}
+
 	if l.Browser.GetXVFB() {
 		*cmd = *exec.CommandContext(ctx, "xvfb-run", cmd.Args...) //nolint:gosec
 	}
@@ -92,6 +107,31 @@ func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 	if err != nil {
 		return fmt.Errorf("bin path %s: %w", binPath, err)
 	}
+
+	// Ensure that all leading paths have execute enabled for user, group, and other
+	base, err := filepath.Abs(filepath.Dir(binPath))
+	if err != nil {
+		return fmt.Errorf("resolve base path %s: %w", binPath, err)
+	}
+	pname := "/"
+	for _, part := range strings.Split(base, string(filepath.Separator)) {
+		if part == "" {
+			continue
+		}
+		pname = filepath.Join(pname, part)
+		st, err := os.Stat(pname)
+		if err != nil {
+			return fmt.Errorf("stat path %s: %w", pname, err)
+		}
+		if !st.IsDir() {
+			return fmt.Errorf("path %s is not a directory", pname)
+		}
+		cperm := st.Mode().Perm()
+		if err := os.Chmod(pname, cperm|0o111); err != nil { //nolint:gosec
+			l.logger.Errorf("failed to chmod path %s as %o: %s", pname, cperm|0o111, err)
+		}
+	}
+
 	return nil
 }
 
