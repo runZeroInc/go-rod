@@ -486,7 +486,8 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 	}
 
 	// Wait for the page to load
-	page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
+	waitForNav := page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
+	waitForNav()
 
 	// Move the mouse a bit to try and trigger any lazy rendering
 	_ = page.Mouse.MoveTo(proto.Point{X: float64(rand.IntN(w.Width)), Y: float64(rand.IntN(w.Height))}) //nolint:gosec
