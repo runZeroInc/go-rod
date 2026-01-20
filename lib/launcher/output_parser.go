@@ -93,10 +93,10 @@ func (r *ChromiumOutputParser) Err() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	msg := "[launcher] Failed to get the debug url: "
+	msg := "launcher failed to get the debug url from chromium: "
 
 	if strings.Contains(r.Buffer, "error while loading shared libraries") {
-		msg = "[launcher] Failed to launch the browser, the doc might help https://go-rod.github.io/#/compatibility?id=os: "
+		msg = "launcher failed to get the debug url from chromium: missing system libraries, please see https://go-rod.github.io/#/compatibility?id=os: "
 	}
 
 	return errors.New(msg + r.Buffer)
