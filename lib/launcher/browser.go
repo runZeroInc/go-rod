@@ -866,7 +866,7 @@ func (b *Browser) ChooseChromiumPath() (string, error) {
 		}
 		return p, nil
 	}
-	return "", fmt.Errorf("no executable found in %+v", chromiumPaths)
+	return "", fmt.Errorf("no executable found across %d paths", len(chromiumPaths))
 }
 
 // ResolveChromiumPaths returns a list of possibly usable Chromium executables.
