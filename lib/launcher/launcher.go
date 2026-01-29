@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -745,6 +746,27 @@ func (l *Launcher) setupCmd(ctx context.Context, cmd *exec.Cmd) {
 
 	go outToLog(stdoutR, "stdout")
 	go outToLog(stderrR, "stderr")
+
+	// Ensure the pipe writers are closed when the process exits or the
+	// launcher context is cancelled. Closing the writers will cause the
+	// readers to receive EOF and terminate, preventing goroutine leaks.
+	closeOnce := &sync.Once{}
+	closeWriters := func() {
+		closeOnce.Do(func() {
+			_ = stdoutW.Close()
+			_ = stderrW.Close()
+		})
+	}
+
+	go func() {
+		<-ctx.Done()
+		closeWriters()
+	}()
+
+	go func() {
+		<-l.exit
+		closeWriters()
+	}()
 
 	cmd.Stdout = io.MultiWriter(stdoutW, l.parser)
 	cmd.Stderr = io.MultiWriter(stderrW, l.parser)
