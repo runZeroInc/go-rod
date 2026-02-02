@@ -565,7 +565,8 @@ func (l *Launcher) MustLaunch() string {
 
 // Launch a standalone temp browser instance and returns the debug url.
 // bin and profileDir are optional, set them to empty to use the default values.
-// If you want to reuse sessions, such as cookies, set the [Launcher.UserDataDir] to the same location.
+// If you want to reuse sessions, such as cookies, set the [Launcher.UserDataDir]
+// to the same location.
 //
 // Please note launcher can only be used once.
 func (l *Launcher) Launch() (string, error) {
@@ -808,7 +809,22 @@ func (l *Launcher) Kill() {
 
 // Cleanup wait until the Browser exits and remove [flags.UserDataDir].
 func (l *Launcher) Cleanup() {
+	// cancel any derived contexts first
 	l.ctxCancel()
+
+	// Lancher() doesn't setup the call to close the l.exit channel until well
+	// into its logic. If it errors out early it will never do so. Don't block
+	// waiting for <-l.exit if the launcher never started a browser process
+	// (pid == 0). Just remove the user data dir.
+	// NOTE: do NOT use l.hasLaunched() here because that method mutates
+	// the internal launched flag via an atomic operation.
+	if l.pid == 0 {
+		dir := l.Get(flags.UserDataDir)
+		_ = os.RemoveAll(dir)
+		return
+	}
+
+	// Wait for the process goroutine to signal exit, then ensure kill and cleanup.
 	<-l.exit
 	l.Kill()
 	dir := l.Get(flags.UserDataDir)

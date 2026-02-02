@@ -327,3 +327,35 @@ func TestLaunchGetURLTimeoutReached(t *testing.T) {
 		t.Errorf("launch timeout not enforced")
 	}
 }
+
+// TestCleanupWithoutLaunchDoesNotBlock ensures Cleanup returns when Launch was
+// never called (previous behavior could block on <-l.exit).
+func TestCleanupWithoutLaunchDoesNotBlock(t *testing.T) {
+	t.Parallel()
+
+	l, err := launcher.New()
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+
+	dir := l.Get(flags.UserDataDir)
+
+	done := make(chan struct{})
+	go func() {
+		l.Cleanup()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success
+	case <-time.After(3 * time.Second):
+		t.Fatalf("Cleanup blocked when launcher was not launched")
+	}
+
+	if dir != "" {
+		if _, err := os.Stat(dir); err == nil {
+			t.Fatalf("user data dir not removed: %s", dir)
+		}
+	}
+}
