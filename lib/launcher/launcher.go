@@ -79,6 +79,7 @@ var DefaultExecFlags = map[string][]string{
 	"disable-site-isolation-trials":                      nil,
 	"disable-sync":                                       nil,
 	"disable-translate":                                  nil,
+	"disable-web-security":                               nil,
 	"enable-automation":                                  nil,
 	"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
 	"export-tagged-pdf":                                  nil,
