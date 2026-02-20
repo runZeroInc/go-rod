@@ -792,6 +792,9 @@ func (l *Launcher) PID() int {
 
 // Kill the browser process.
 func (l *Launcher) Kill() {
+	if l == nil {
+		return
+	}
 	// TODO: If we kill too fast, the browser's children processes may not be ready.
 	// Browser does not have an API to tell if the children processes are ready.
 	utils.Sleep(1)
@@ -801,18 +804,25 @@ func (l *Launcher) Kill() {
 	}
 
 	killGroup(l.PID())
-	p, err := os.FindProcess(l.PID())
-	if err == nil {
+	if p, err := os.FindProcess(l.PID()); err == nil {
 		_ = p.Kill()
 	}
-	killLeftoverProcesses(l.PID(), l.GetBin())
+	kPid, kBin := l.PID(), l.GetBin()
+	if kPid != 0 && kBin != "" {
+		killLeftoverProcesses(kPid, kBin)
+	}
 }
 
 // Cleanup wait until the Browser exits and remove [flags.UserDataDir].
 func (l *Launcher) Cleanup() {
-	// cancel any derived contexts first
-	l.ctxCancel()
+	if l == nil {
+		return
+	}
 
+	// cancel any derived contexts first
+	if l.ctxCancel != nil {
+		l.ctxCancel()
+	}
 	// Lancher() doesn't setup the call to close the l.exit channel until well
 	// into its logic. If it errors out early it will never do so. Don't block
 	// waiting for <-l.exit if the launcher never started a browser process
@@ -820,14 +830,16 @@ func (l *Launcher) Cleanup() {
 	// NOTE: do NOT use l.hasLaunched() here because that method mutates
 	// the internal launched flag via an atomic operation.
 	if l.pid == 0 {
-		dir := l.Get(flags.UserDataDir)
-		_ = os.RemoveAll(dir)
+		if dir := l.Get(flags.UserDataDir); dir != "" {
+			_ = os.RemoveAll(dir)
+		}
 		return
 	}
 
 	// Wait for the process goroutine to signal exit, then ensure kill and cleanup.
 	<-l.exit
 	l.Kill()
-	dir := l.Get(flags.UserDataDir)
-	_ = os.RemoveAll(dir)
+	if dir := l.Get(flags.UserDataDir); dir != "" {
+		_ = os.RemoveAll(dir)
+	}
 }
