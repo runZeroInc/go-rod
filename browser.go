@@ -202,6 +202,10 @@ func (b *Browser) GetLauncher() *launcher.Launcher {
 
 // Close the browser.
 func (b *Browser) Close() error {
+	if b.client == nil {
+		// Nothing to close if we never connected to a browser
+		return nil
+	}
 	if b.BrowserContextID == "" {
 		return proto.BrowserClose{}.Call(b)
 	}
@@ -270,6 +274,10 @@ func (b *Browser) Pages() (Pages, error) {
 
 // Call implements the [proto.Client] to call raw cdp interface directly.
 func (b *Browser) Call(ctx context.Context, sessionID, methodName string, params any) (res []byte, err error) {
+	if b.client == nil {
+		return nil, fmt.Errorf("Browser.CDPClient is nil, can't call method %s", methodName)
+	}
+
 	res, err = b.client.Call(ctx, sessionID, methodName, params)
 	if err != nil {
 		return nil, err
