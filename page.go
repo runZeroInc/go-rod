@@ -319,7 +319,15 @@ func (p *Page) StopLoading() error {
 func (p *Page) Close() error {
 	p.browser.targetsLock.Lock()
 	defer p.browser.targetsLock.Unlock()
+	return p.CloseWithoutLock()
+}
 
+// CloseWithoutLock tries to close page, running its beforeunload hooks,
+// if has any. The logic does not utilize locks and should be used only when
+// the caller created the page and and controls its full lifecycle. The page's
+// TargetID should be be shared with other pages as it will be cleaded from the
+// Browser's 'states' map.
+func (p *Page) CloseWithoutLock() error {
 	success := true
 	ctx, cancel := context.WithCancel(p.ctx)
 	defer cancel()
@@ -327,7 +335,7 @@ func (p *Page) Close() error {
 
 	for {
 		err := proto.PageClose{}.Call(p)
-		// TODO: Fix this so errors.Is() works correctlys
+		// TODO: Fix this so errors.Is() works correctly
 		if err != nil && strings.Contains(err.Error(), cdp.ErrNotAttachedToActivePage.Message) {
 			utils.Sleep(0.1)
 			continue
