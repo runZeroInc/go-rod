@@ -471,7 +471,11 @@ func (w *Webshot) Screenshot(url string) (*WebshotResult, error) {
 		w.Stats.Failures.Add(1)
 		return nil, fmt.Errorf("page: %w", err)
 	}
-	defer page.Close()
+
+	// Using CloseWithoutLock() is safe here because this method created the page
+	// and controls its full lifecycle, and the page's TargetID is not shared with
+	// other pages.
+	defer page.CloseWithoutLock()
 
 	page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
 		Width:             w.Width,
