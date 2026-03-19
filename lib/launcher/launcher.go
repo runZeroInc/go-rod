@@ -48,19 +48,19 @@ var DefaultExecFlags = map[string][]string{
 
 	"disable-features": {
 		"site-per-process", // See https://github.com/puppeteer/puppeteer/issues/2548
-		"TranslateUI",
+		"Translate",        // Renamed from TranslateUI in Sept 2020
 		"OptimizationGuideModelDownloading", "OptimizationHintsFetching", "OptimizationTargetPrediction", "OptimizationHints",
 		//"NetworkService", "NetworkServiceInProcess",
 	},
 
 	"allow-chrome-scheme-url":                            nil, // Allow chrome:// URLs in headless mode
 	"allow-pre-commit-input":                             nil,
-	"bwsi":                                               nil,
+	"bwsi":                                               nil, // Browser without sign-in (guest mode), prevents the first-run experience, disables extensions, sync, and bookmarks
 	"disable-background-networking":                      nil,
 	"disable-background-timer-throttling":                nil,
 	"disable-backgrounding-occluded-windows":             nil,
 	"disable-breakpad":                                   nil, // Slightly silences crash dumps: https://github.com/runZeroInc/platform/issues/19900
-	"disable-client-side-phishing-detection":             nil,
+	"disable-client-side-phishing-detection":             nil, // TODO: Removed from Chrome in May 2022, managed by Safe Browseing pref levels
 	"disable-component-extensions-with-background-pages": nil,
 	"disable-component-update":                           nil,
 	"disable-crash-reporter":                             nil,
@@ -68,35 +68,35 @@ var DefaultExecFlags = map[string][]string{
 	"disable-dev-shm-usage":                              nil, // Workaround for limited VM environments
 	"disable-gpu":                                        nil,
 	"disable-hang-monitor":                               nil,
-	"disable-infobars":                                   nil,
-	"disable-ipc-flooding-protection":                    nil,
-	"disable-notifications":                              nil,
-	"disable-plugins":                                    nil,
-	"disable-popup-blocking":                             nil,
-	"disable-prompt-on-repost":                           nil,
-	"disable-renderer-backgrounding":                     nil,
-	"disable-search-engine-choice-screen":                nil,
-	"disable-site-isolation-trials":                      nil,
-	"disable-sync":                                       nil,
-	"disable-translate":                                  nil,
-	"disable-web-security":                               nil,
-	"enable-automation":                                  nil,
-	"enable-features":                                    {"NetworkService", "NetworkServiceInProcess"},
-	"export-tagged-pdf":                                  nil,
-	"force-color-profile":                                {"srgb"},
-	"generate-pdf-document-outline":                      nil,
-	"hide-scrollbars":                                    nil,
-	"ignore-certificate-errors":                          nil,
-	"metrics-recording-only":                             nil,
-	"mute-audio":                                         nil,
-	"no-crashpad":                                        nil,
-	"no-default-browser-check":                           nil,
-	"password-store":                                     {"basic"},
-	"safebrowsing-disable-auto-update":                   nil,
-	"use-mock-keychain":                                  nil, // Avoid macOS keychain prompts
-	"enable-logging":                                     {"stderr"},
-	"v":                                                  {"1"},
-	"log-level":                                          {"1"},
+	// "disable-infobars":                                   nil, // Removed from Chrome in 2019/2020 due to malware abuse
+	"disable-ipc-flooding-protection":     nil,
+	"disable-notifications":               nil,
+	"disable-plugins":                     nil,
+	"disable-popup-blocking":              nil,
+	"disable-prompt-on-repost":            nil,
+	"disable-renderer-backgrounding":      nil,
+	"disable-search-engine-choice-screen": nil,
+	"disable-site-isolation-trials":       nil,
+	"disable-sync":                        nil,
+	// "disable-translate":                   nil, // Removed from Chrome in 2017.
+	"disable-web-security": nil, // PR #8 - to stop redirect loop
+	"enable-automation":    nil,
+	"enable-features":      {"NetworkService", "NetworkServiceInProcess"},
+	// "export-tagged-pdf":                                  nil, // Enabled by default in Chrome 85 released August 2020
+	"force-color-profile":           {"srgb"},
+	"generate-pdf-document-outline": nil,
+	"hide-scrollbars":               nil,
+	"ignore-certificate-errors":     nil,
+	"metrics-recording-only":        nil,
+	"mute-audio":                    nil,
+	"no-crashpad":                   nil,
+	"no-default-browser-check":      nil,
+	"password-store":                {"basic"},
+	// "safebrowsing-disable-auto-update": nil, // Removed from Chrome in 2014, use 'disable-background-networking'
+	"use-mock-keychain": nil, // Avoid macOS keychain prompts
+	"enable-logging":    {"stderr"},
+	"v":                 {"1"},
+	"log-level":         {"1"},
 }
 
 // Launcher is a helper to launch browser binary smartly.
