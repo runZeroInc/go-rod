@@ -363,6 +363,27 @@ func (p *Page) Close() error {
 	return nil
 }
 
+// ForceClose closes the page using TargetCloseTarget with an independent timeout.
+// Unlike Close(), it does not rely on the page's context and always cleans up
+// cached state, preventing zombie tabs when the page context has expired.
+func (p *Page) ForceClose(timeout time.Duration) error {
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+
+	closeCtx, closeCancel := context.WithTimeout(context.Background(), timeout)
+	defer closeCancel()
+
+	_, err := proto.TargetCloseTarget{
+		TargetID: p.TargetID,
+	}.Call(p.browser.Context(closeCtx))
+
+	// Always clean up cached state regardless of close outcome to prevent leaks
+	p.cleanupStates()
+
+	return err
+}
+
 // TriggerFavicon supports when browser in headless mode
 // to trigger favicon's request. Pay attention to this
 // function only supported when browser in headless mode,

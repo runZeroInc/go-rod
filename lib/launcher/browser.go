@@ -309,6 +309,7 @@ type Browser struct {
 	GID                 int
 	NoSandbox           bool
 	HideWindow          bool
+	VerboseLogging      bool
 	LaunchTimeout       time.Duration
 
 	workingDir        string
@@ -504,6 +505,15 @@ func WithNoSandbox(v bool) BrowserOption {
 func WithHideWindow(v bool) BrowserOption {
 	return func(b *Browser) {
 		b.HideWindow = v
+	}
+}
+
+// WithVerboseLogging enables Chrome's verbose stderr/stdout logging flags
+// (--enable-logging=stderr --v=1 --log-level=1). Disabled by default to
+// reduce I/O pressure during long-running scans with many tabs.
+func WithVerboseLogging(v bool) BrowserOption {
+	return func(b *Browser) {
+		b.VerboseLogging = v
 	}
 }
 

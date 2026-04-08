@@ -94,9 +94,6 @@ var DefaultExecFlags = map[string][]string{
 	"password-store":                                     {"basic"},
 	"safebrowsing-disable-auto-update":                   nil,
 	"use-mock-keychain":                                  nil, // Avoid macOS keychain prompts
-	"enable-logging":                                     {"stderr"},
-	"v":                                                  {"1"},
-	"log-level":                                          {"1"},
 }
 
 // Launcher is a helper to launch browser binary smartly.
@@ -292,6 +289,13 @@ func GetExecFlags(conf *Browser) map[flags.Flag][]string {
 	}
 	if conf.UserAgent != "" {
 		execFlags["user-agent"] = []string{conf.UserAgent}
+	}
+
+	// Only enable verbose Chrome logging when explicitly requested
+	if conf.VerboseLogging {
+		execFlags["enable-logging"] = []string{"stderr"}
+		execFlags["v"] = []string{"1"}
+		execFlags["log-level"] = []string{"1"}
 	}
 
 	// Clear any flags specified by the user

@@ -200,16 +200,34 @@ func (b *Browser) GetLauncher() *launcher.Launcher {
 	return b.launcher
 }
 
-// Close the browser.
+// Close the browser. Uses a 10-second timeout to avoid hanging indefinitely
+// when Chrome is unresponsive.
 func (b *Browser) Close() error {
+	return b.CloseWithTimeout(10 * time.Second)
+}
+
+// CloseWithTimeout closes the browser with a specific timeout. If the timeout
+// is zero, no timeout is applied (not recommended for production use).
+func (b *Browser) CloseWithTimeout(timeout time.Duration) error {
 	if b.client == nil {
 		// Nothing to close if we never connected to a browser
 		return nil
 	}
-	if b.BrowserContextID == "" {
-		return proto.BrowserClose{}.Call(b)
+
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		ctx, cancel = context.WithCancel(b.ctx)
 	}
-	return proto.TargetDisposeBrowserContext{BrowserContextID: b.BrowserContextID}.Call(b)
+	defer cancel()
+
+	bCtx := b.Context(ctx)
+	if b.BrowserContextID == "" {
+		return proto.BrowserClose{}.Call(bCtx)
+	}
+	return proto.TargetDisposeBrowserContext{BrowserContextID: b.BrowserContextID}.Call(bCtx)
 }
 
 // Page creates a new browser tab with the default context. If opts.URL is empty, the default target will be "about:blank".
