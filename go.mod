@@ -1,6 +1,6 @@
 module github.com/runZeroInc/go-rod
 
-go 1.26.1
+go 1.25.0
 
 require (
 	github.com/gobwas/ws v1.4.0
