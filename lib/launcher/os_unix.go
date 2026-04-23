@@ -53,6 +53,9 @@ func (l *Launcher) getSysProcAttr(uid, gid int) (*syscall.SysProcAttr, error) {
 	v := &syscall.SysProcAttr{
 		Setpgid: true,
 	}
+	// Request SIGKILL-on-parent-death on Linux so orphaned Chrome trees
+	// cannot survive a crashed/killed launcher.
+	setPdeathsig(v)
 	if os.Geteuid() == 0 && uid != 0 {
 		cred := &syscall.Credential{
 			Uid:         uint32(uid),
