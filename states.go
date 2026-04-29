@@ -56,6 +56,29 @@ func (b *Browser) RemoveState(key any) {
 	b.states.Delete(key)
 }
 
+// RemoveStatesBySessionID removes every (sessionID, *) state entry tracked by
+// the browser. Browser.Call records the params of every CDP call into the
+// states map keyed by (BrowserContextID, SessionID, methodName), but the
+// per-page cleanupStates() path only knows how to delete the page-cache entry
+// keyed by TargetID. Without explicit purging, long-running browsers that
+// open and close many short-lived pages accumulate one entry per CDP call
+// forever. Call this on page close to release that memory.
+func (b *Browser) RemoveStatesBySessionID(sessionID proto.TargetSessionID) {
+	if sessionID == "" {
+		return
+	}
+	b.states.Range(func(key, _ any) bool {
+		sk, ok := key.(stateKey)
+		if !ok {
+			return true
+		}
+		if sk.browserContextID == b.BrowserContextID && sk.sessionID == sessionID {
+			b.states.Delete(key)
+		}
+		return true
+	})
+}
+
 // EnableDomain and returns a restore function to restore previous state.
 func (b *Browser) EnableDomain(sessionID proto.TargetSessionID, req proto.Request) (restore func()) {
 	_, enabled := b.states.Load(b.key(sessionID, req.ProtoReq()))
@@ -116,4 +139,8 @@ func (p *Page) DisableDomain(method proto.Request) (restore func()) {
 
 func (p *Page) cleanupStates() {
 	p.browser.RemoveState(p.TargetID)
+	// Drop every (sessionID, *) entry recorded by Browser.Call so that
+	// long-lived browsers that churn through many pages do not retain
+	// per-call params forever. See RemoveStatesBySessionID for context.
+	p.browser.RemoveStatesBySessionID(p.SessionID)
 }
