@@ -54,11 +54,33 @@ func (b *Browser) Sleeper(sleeper func() utils.Sleeper) *Browser {
 }
 
 // Context returns a clone with the specified ctx for chained sub-operations.
+//
+// Mouse, Keyboard, and Touch are rebound to the clone so CDP calls issued
+// through them (e.g. page.Mouse.MoveTo) honor the new context. Without this
+// rebinding the helpers would still hold a pointer to the original Page and
+// continue to use its (typically browser-wide, untimeout'd) context, which
+// allowed a stuck CDP request to block indefinitely even when the caller
+// scoped the operation with Page.Context(ctx).
+//
+// Helper input state (Mouse position/buttons, Keyboard pressed-key set,
+// Touch state) is not shared with the original Page; it is reset on the
+// clone. Callers that need to preserve input state across Context() calls
+// should snapshot it explicitly.
 func (p *Page) Context(ctx context.Context) *Page {
 	p.helpersLock.Lock()
 	newObj := *p
 	p.helpersLock.Unlock()
 	newObj.ctx = ctx
+	// Rebind input helpers to the clone so their CDP calls use ctx.
+	if newObj.Mouse != nil {
+		newObj.newMouse()
+	}
+	if newObj.Keyboard != nil {
+		newObj.newKeyboard()
+	}
+	if newObj.Touch != nil {
+		newObj.newTouch()
+	}
 	return &newObj
 }
 
