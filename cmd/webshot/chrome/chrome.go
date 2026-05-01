@@ -555,7 +555,13 @@ t.src = "about:blank";
   return f;
 })()`
 
-	okeys, err := page.Eval(scrapeGlobals)
+	// Use a fresh context for the post-screenshot Eval so it isn't starved
+	// by pageCtx, which was sized for init + navigation + the capture loop
+	// and may already be very near (or past) its deadline by the time we
+	// reach this point on slower hosts (e.g. Windows CI).
+	evalCtx, evalCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer evalCancel()
+	okeys, err := page.Context(evalCtx).Eval(scrapeGlobals)
 	if err != nil {
 		w.Logger.Tracef("failed to scrape globals from %s: %v", url, err)
 	} else {
