@@ -246,9 +246,25 @@ func (b *Browser) PageWithContext(ctx context.Context, opts proto.TargetCreateTa
 		return nil, err
 	}
 	defer func() {
-		// If Navigate or PageFromTarget fails we should close the target to prevent leak
+		// If Navigate or PageFromTarget fails we should close the target to prevent leak.
+		// We deliberately layer an *independent* short timeout on top of any inherited
+		// context here:
+		//   1. The caller's ctx may already be canceled (that is why err != nil), in
+		//      which case Call(b.Context(ctx)) would return immediately without
+		//      actually closing the target — leaking the renderer.
+		//   2. b.ctx is the browser-lifetime context with no deadline, so a wedged
+		//      renderer (frozen JS, dead websocket peer that has not yet emitted
+		//      EOF, GPU process panic, etc.) would park this goroutine until the
+		//      whole browser is torn down. We have observed this in long-running
+		//      production scans where a single stuck TargetCloseTarget pinned a
+		//      worker goroutine for 4+ hours and ultimately wedged the higher-
+		//      level wait loop.
+		// A 5s budget is plenty for a target close (it is a single CDP round
+		// trip with no rendering work) and matches Page.ForceClose's default.
 		if err != nil {
-			_, _ = proto.TargetCloseTarget{TargetID: target.TargetID}.Call(b)
+			closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer closeCancel()
+			_, _ = proto.TargetCloseTarget{TargetID: target.TargetID}.Call(b.Context(closeCtx))
 		}
 	}()
 
