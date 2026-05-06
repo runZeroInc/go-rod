@@ -3,9 +3,11 @@
 package api
 
 import (
-	"golang.org/x/sys/windows"
-
+	"runtime"
+	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379593.aspx
@@ -50,8 +52,16 @@ var (
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa446645.aspx
 func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, owner, group **windows.SID, dacl, sacl, secDesc *windows.Handle) error {
-	ret, _, _ := procGetNamedSecurityInfoW.Call(
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(objectName))),
+	// Hoist StringToUTF16Ptr into a named local so the compiler's
+	// pointer-pinning rule for syscall arguments has something to pin --
+	// inlined into the call list it would be GC-eligible the moment its
+	// uintptr is consumed. Use syscall.SyscallN (asm-implemented) rather
+	// than (*Proc).Call (Go-implemented): the pinning rule for
+	// unsafe.Pointer->uintptr arguments only applies to the former.
+	namePtr := windows.StringToUTF16Ptr(objectName)
+	ret, _, _ := syscall.SyscallN(
+		procGetNamedSecurityInfoW.Addr(),
+		uintptr(unsafe.Pointer(namePtr)),
 		uintptr(objectType),
 		uintptr(secInfo),
 		uintptr(unsafe.Pointer(owner)),
@@ -60,6 +70,7 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(sacl)),
 		uintptr(unsafe.Pointer(secDesc)),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -68,8 +79,10 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379579.aspx
 func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, owner, group *windows.SID, dacl, sacl windows.Handle) error {
-	ret, _, _ := procSetNamedSecurityInfoW.Call(
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(objectName))),
+	namePtr := windows.StringToUTF16Ptr(objectName)
+	ret, _, _ := syscall.SyscallN(
+		procSetNamedSecurityInfoW.Addr(),
+		uintptr(unsafe.Pointer(namePtr)),
 		uintptr(objectType),
 		uintptr(secInfo),
 		uintptr(unsafe.Pointer(owner)),
@@ -77,6 +90,7 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(dacl),
 		uintptr(sacl),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}

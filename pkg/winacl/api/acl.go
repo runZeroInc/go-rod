@@ -3,9 +3,11 @@
 package api
 
 import (
-	"golang.org/x/sys/windows"
-
+	"runtime"
+	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379284.aspx
@@ -85,12 +87,20 @@ type ExplicitAccess struct {
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379576.aspx
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
-	ret, _, _ := procSetEntriesInAclW.Call(
+	// Use syscall.SyscallN (asm-implemented) so the compiler's
+	// unsafe.Pointer->uintptr pinning rule applies; (*Proc).Call is
+	// Go-implemented and does not trigger the rule, which lets the GC
+	// move &entries[0] / newAcl while the kernel is still reading or
+	// writing through them.
+	ret, _, _ := syscall.SyscallN(
+		procSetEntriesInAclW.Addr(),
 		uintptr(len(entries)),
 		uintptr(unsafe.Pointer(&entries[0])),
 		uintptr(oldAcl),
 		uintptr(unsafe.Pointer(newAcl)),
 	)
+	runtime.KeepAlive(entries)
+	runtime.KeepAlive(newAcl)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}

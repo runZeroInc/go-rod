@@ -3,9 +3,11 @@
 package api
 
 import (
-	"golang.org/x/sys/windows"
-
+	"runtime"
+	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ee207397.aspx
@@ -118,12 +120,18 @@ var (
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa446585.aspx
 func CreateWellKnownSid(sidType int32, sidDomain, sid *windows.SID, sidLen *uint32) error {
-	ret, _, err := procCreateWellKnownSid.Call(
+	// syscall.SyscallN (asm) triggers the unsafe.Pointer->uintptr pinning
+	// rule; (*Proc).Call (Go) does not.
+	ret, _, err := syscall.SyscallN(
+		procCreateWellKnownSid.Addr(),
 		uintptr(sidType),
 		uintptr(unsafe.Pointer(sidDomain)),
 		uintptr(unsafe.Pointer(sid)),
 		uintptr(unsafe.Pointer(sidLen)),
 	)
+	runtime.KeepAlive(sidDomain)
+	runtime.KeepAlive(sid)
+	runtime.KeepAlive(sidLen)
 	if ret == 0 {
 		return err
 	}

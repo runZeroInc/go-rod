@@ -5,6 +5,8 @@ package winacl
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -57,28 +59,31 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		return 0, fmt.Errorf("user: %w", err)
 	}
 
-	// If domain is empty, pass a null pointer instead
-	var pDomain *uintptr
+	// Hold the *uint16 returned by UTF16PtrFromString in a typed local so it
+	// has a live Go reference for the duration of the syscall (KeepAlive
+	// below). The previous `(*uintptr)(unsafe.Pointer(t))` reinterpretation
+	// discarded the pointer's type and made it invisible to the GC.
+	var pDomain *uint16
 	if domain != "" {
-		t, err := windows.UTF16PtrFromString(domain)
+		pDomain, err = windows.UTF16PtrFromString(domain)
 		if err != nil {
 			return 0, fmt.Errorf("domain: %w", err)
 		}
-		pDomain = (*uintptr)(unsafe.Pointer(t))
 	}
 
-	// If password is empty, pass a null pointer instead
-	var pPassword *uintptr
+	var pPassword *uint16
 	if password != "" {
-		t, err := windows.UTF16PtrFromString(password)
+		pPassword, err = windows.UTF16PtrFromString(password)
 		if err != nil {
 			return 0, fmt.Errorf("password: %w", err)
 		}
-		pPassword = (*uintptr)(unsafe.Pointer(t))
 	}
 
 	hToken := uintptr(0)
-	res, _, err := logonUserW.Call(
+	// syscall.SyscallN (asm) triggers the unsafe.Pointer->uintptr pinning
+	// rule; (*Proc).Call (Go) does not.
+	res, _, err := syscall.SyscallN(
+		logonUserW.Addr(),
 		uintptr(unsafe.Pointer(pUsername)),
 		uintptr(unsafe.Pointer(pDomain)),
 		uintptr(unsafe.Pointer(pPassword)),
@@ -86,6 +91,9 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
+	runtime.KeepAlive(pUsername)
+	runtime.KeepAlive(pDomain)
+	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}
@@ -175,8 +183,10 @@ func DenyName(accessPermissions uint32, name string) ExplicitAccess {
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa446645.aspx
 func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, owner, group **windows.SID, dacl, sacl, secDesc *windows.Handle) error {
-	ret, _, _ := procGetNamedSecurityInfoW.Call(
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(objectName))),
+	namePtr := windows.StringToUTF16Ptr(objectName)
+	ret, _, _ := syscall.SyscallN(
+		procGetNamedSecurityInfoW.Addr(),
+		uintptr(unsafe.Pointer(namePtr)),
 		uintptr(objectType),
 		uintptr(secInfo),
 		uintptr(unsafe.Pointer(owner)),
@@ -185,6 +195,7 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(sacl)),
 		uintptr(unsafe.Pointer(secDesc)),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -193,8 +204,10 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379579.aspx
 func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, owner, group *windows.SID, dacl, sacl windows.Handle) error {
-	ret, _, _ := procSetNamedSecurityInfoW.Call(
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(objectName))),
+	namePtr := windows.StringToUTF16Ptr(objectName)
+	ret, _, _ := syscall.SyscallN(
+		procSetNamedSecurityInfoW.Addr(),
+		uintptr(unsafe.Pointer(namePtr)),
 		uintptr(objectType),
 		uintptr(secInfo),
 		uintptr(unsafe.Pointer(owner)),
@@ -202,6 +215,7 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(dacl),
 		uintptr(sacl),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -255,12 +269,16 @@ func osWindowsApplyACL(name string, replace, inherit bool, entries ...ExplicitAc
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa446585.aspx
 func CreateWellKnownSid(sidType int32, sidDomain, sid *windows.SID, sidLen *uint32) error {
-	ret, _, err := procCreateWellKnownSid.Call(
+	ret, _, err := syscall.SyscallN(
+		procCreateWellKnownSid.Addr(),
 		uintptr(sidType),
 		uintptr(unsafe.Pointer(sidDomain)),
 		uintptr(unsafe.Pointer(sid)),
 		uintptr(unsafe.Pointer(sidLen)),
 	)
+	runtime.KeepAlive(sidDomain)
+	runtime.KeepAlive(sid)
+	runtime.KeepAlive(sidLen)
 	if ret == 0 {
 		return err
 	}
@@ -286,12 +304,15 @@ type ExplicitAccess struct {
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379576.aspx
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
-	ret, _, _ := procSetEntriesInAclW.Call(
+	ret, _, _ := syscall.SyscallN(
+		procSetEntriesInAclW.Addr(),
 		uintptr(len(entries)),
 		uintptr(unsafe.Pointer(&entries[0])),
 		uintptr(oldAcl),
 		uintptr(unsafe.Pointer(newAcl)),
 	)
+	runtime.KeepAlive(entries)
+	runtime.KeepAlive(newAcl)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
