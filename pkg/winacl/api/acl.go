@@ -3,7 +3,6 @@
 package api
 
 import (
-	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -99,8 +98,6 @@ func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *wi
 		uintptr(oldAcl),
 		uintptr(unsafe.Pointer(newAcl)),
 	)
-	runtime.KeepAlive(entries)
-	runtime.KeepAlive(newAcl)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}

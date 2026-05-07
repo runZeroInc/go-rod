@@ -5,7 +5,6 @@ package winacl
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -59,10 +58,9 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		return 0, fmt.Errorf("user: %w", err)
 	}
 
-	// Hold the *uint16 returned by UTF16PtrFromString in a typed local so it
-	// has a live Go reference for the duration of the syscall (KeepAlive
-	// below). The previous `(*uintptr)(unsafe.Pointer(t))` reinterpretation
-	// discarded the pointer's type and made it invisible to the GC.
+	// Hold the *uint16 returned by UTF16PtrFromString in a typed local so
+	// the compiler's pointer-pinning rule for syscall.SyscallN arguments
+	// can keep it alive.
 	var pDomain *uint16
 	if domain != "" {
 		pDomain, err = windows.UTF16PtrFromString(domain)
@@ -91,9 +89,6 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
-	runtime.KeepAlive(pUsername)
-	runtime.KeepAlive(pDomain)
-	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}
@@ -195,7 +190,6 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(sacl)),
 		uintptr(unsafe.Pointer(secDesc)),
 	)
-	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -215,7 +209,6 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(dacl),
 		uintptr(sacl),
 	)
-	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -249,7 +242,7 @@ func osWindowsApplyACL(name string, replace, inherit bool, entries ...ExplicitAc
 	); err != nil {
 		return err
 	}
-	defer windows.LocalFree((windows.Handle)(unsafe.Pointer(acl)))
+	defer windows.LocalFree(acl)
 	var secInfo uint32
 	if !inherit {
 		secInfo = PROTECTED_DACL_SECURITY_INFORMATION
@@ -276,9 +269,6 @@ func CreateWellKnownSid(sidType int32, sidDomain, sid *windows.SID, sidLen *uint
 		uintptr(unsafe.Pointer(sid)),
 		uintptr(unsafe.Pointer(sidLen)),
 	)
-	runtime.KeepAlive(sidDomain)
-	runtime.KeepAlive(sid)
-	runtime.KeepAlive(sidLen)
 	if ret == 0 {
 		return err
 	}
@@ -311,8 +301,6 @@ func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *wi
 		uintptr(oldAcl),
 		uintptr(unsafe.Pointer(newAcl)),
 	)
-	runtime.KeepAlive(entries)
-	runtime.KeepAlive(newAcl)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}

@@ -3,8 +3,6 @@
 package winacl
 
 import (
-	"unsafe"
-
 	"github.com/runZeroInc/go-rod/pkg/winacl/api"
 	"golang.org/x/sys/windows"
 )
@@ -36,7 +34,7 @@ func Apply(name string, replace, inherit bool, entries ...api.ExplicitAccess) er
 	); err != nil {
 		return err
 	}
-	defer windows.LocalFree((windows.Handle)(unsafe.Pointer(acl)))
+	defer windows.LocalFree(acl)
 	var secInfo uint32
 	if !inherit {
 		secInfo = api.PROTECTED_DACL_SECURITY_INFORMATION

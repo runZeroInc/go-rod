@@ -3,7 +3,6 @@
 package api
 
 import (
-	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -129,9 +128,6 @@ func CreateWellKnownSid(sidType int32, sidDomain, sid *windows.SID, sidLen *uint
 		uintptr(unsafe.Pointer(sid)),
 		uintptr(unsafe.Pointer(sidLen)),
 	)
-	runtime.KeepAlive(sidDomain)
-	runtime.KeepAlive(sid)
-	runtime.KeepAlive(sidLen)
 	if ret == 0 {
 		return err
 	}

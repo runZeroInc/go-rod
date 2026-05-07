@@ -4,7 +4,6 @@ package api
 
 import (
 	"fmt"
-	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -98,10 +97,9 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 	}
 
 	// If domain is empty, pass a null pointer instead. Hold the actual
-	// *uint16 returned by UTF16PtrFromString so it has a live Go reference
-	// for the duration of the syscall (KeepAlive below); the previous
-	// `(*uintptr)(unsafe.Pointer(t))` reinterpretation discarded the
-	// pointer's type and made it invisible to the GC.
+	// *uint16 returned by UTF16PtrFromString in a typed local so the
+	// compiler's pointer-pinning rule for syscall.SyscallN arguments
+	// can keep it alive.
 	var pDomain *uint16
 	if domain != "" {
 		pDomain, err = windows.UTF16PtrFromString(domain)
@@ -132,9 +130,6 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
-	runtime.KeepAlive(pUsername)
-	runtime.KeepAlive(pDomain)
-	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}
