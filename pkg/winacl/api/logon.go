@@ -4,6 +4,7 @@ package api
 
 import (
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -130,6 +131,9 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
+	runtime.KeepAlive(pUsername)
+	runtime.KeepAlive(pDomain)
+	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}

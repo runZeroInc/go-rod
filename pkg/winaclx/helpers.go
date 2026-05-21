@@ -5,6 +5,7 @@ package winacl
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -89,6 +90,9 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
+	runtime.KeepAlive(pUsername)
+	runtime.KeepAlive(pDomain)
+	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}
@@ -190,6 +194,7 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(sacl)),
 		uintptr(unsafe.Pointer(secDesc)),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -209,6 +214,7 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(dacl),
 		uintptr(sacl),
 	)
+	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
