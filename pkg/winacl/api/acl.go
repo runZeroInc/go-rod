@@ -1,8 +1,10 @@
-//+build windows
+//go:build windows
+// +build windows
 
 package api
 
 import (
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -86,11 +88,28 @@ type ExplicitAccess struct {
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379576.aspx
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
-	// Use syscall.SyscallN (asm-implemented) so the compiler's
-	// unsafe.Pointer->uintptr pinning rule applies; (*Proc).Call is
-	// Go-implemented and does not trigger the rule, which lets the GC
-	// move &entries[0] / newAcl while the kernel is still reading or
-	// writing through them.
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Pin every pointer the kernel will dereference *transitively* through
+	// the entries slice. The unsafe.Pointer->uintptr pinning rule inside
+	// syscall.SyscallN only pins what is passed directly as a uintptr arg
+	// (here, &entries[0]). The kernel also reads through
+	// entries[i].Trustee.Name -- a *uint16 that, depending on TrusteeForm,
+	// is either a UTF-16 string or a SID pointer (cast via
+	// (*uint16)(unsafe.Pointer(sid))). Those targets are NOT covered by
+	// the inline pinning rule, and the typed-as-*uint16 cast obscures the
+	// true allocation from escape analysis, which has been the source of
+	// delayed memory-corruption crashes on long-running Windows scanners.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	for i := range entries {
+		if entries[i].Trustee.Name != nil {
+			pinner.Pin(entries[i].Trustee.Name)
+		}
+	}
+
 	ret, _, _ := syscall.SyscallN(
 		procSetEntriesInAclW.Addr(),
 		uintptr(len(entries)),

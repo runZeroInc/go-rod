@@ -90,9 +90,6 @@ func LogonUser(username, domain, password string, logonType LogonType, logonProv
 		uintptr(logonProvider),
 		uintptr(unsafe.Pointer(&hToken)),
 	)
-	runtime.KeepAlive(pUsername)
-	runtime.KeepAlive(pDomain)
-	runtime.KeepAlive(pPassword)
 	if res != 0 {
 		return windows.Token(hToken), nil
 	}
@@ -194,7 +191,6 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(sacl)),
 		uintptr(unsafe.Pointer(secDesc)),
 	)
-	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -214,7 +210,6 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(dacl),
 		uintptr(sacl),
 	)
-	runtime.KeepAlive(namePtr)
 	if ret != 0 {
 		return windows.Errno(ret)
 	}
@@ -300,6 +295,24 @@ type ExplicitAccess struct {
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/aa379576.aspx
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Pin every pointer the kernel will dereference *transitively* through
+	// entries[i].Trustee.Name. The unsafe.Pointer->uintptr pinning rule in
+	// syscall.SyscallN only pins direct arguments (&entries[0]); pointers
+	// nested inside that struct -- here, the SID or UTF-16 buffer cast to
+	// *uint16 -- are NOT covered, and the cast through a smaller type
+	// obscures the true allocation from escape analysis.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	for i := range entries {
+		if entries[i].Trustee.Name != nil {
+			pinner.Pin(entries[i].Trustee.Name)
+		}
+	}
+
 	ret, _, _ := syscall.SyscallN(
 		procSetEntriesInAclW.Addr(),
 		uintptr(len(entries)),
