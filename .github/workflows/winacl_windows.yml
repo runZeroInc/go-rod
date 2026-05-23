@@ -40,7 +40,12 @@ jobs:
       # SetEntriesInAcl. With checkptr=2 and aggressive GC, an unpinned
       # SID pointer reached via Trustee.Name = (*uint16)(unsafe.Pointer(sid))
       # will fault inside the kernel call or trip the pointer checker.
-      - name: Run winacl GC stress test (race + checkptr=2)
+      # Stress run with cgocheck2 experiment, which performs the deeper
+      # pointer checks that were previously enabled by GODEBUG=cgocheck=2
+      # (removed at runtime in newer Go releases). Combined with
+      # -gcflags=all=-d=checkptr=2 and GOGC=1, an unpinned interior
+      # pointer reached via Trustee.Name will fault here.
+      - name: Run winacl GC stress test (race + checkptr=2 + cgocheck2)
         run: >-
           go test -v -race -count=3
           -gcflags=all=-d=checkptr=2
@@ -48,4 +53,4 @@ jobs:
           ./pkg/winacl/...
         env:
           GOGC: "1"
-          GODEBUG: "cgocheck=2"
+          GOEXPERIMENT: "cgocheck2"
