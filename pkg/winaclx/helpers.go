@@ -235,6 +235,24 @@ func osWindowsApplyACL(name string, replace, inherit bool, entries ...ExplicitAc
 		)
 		defer windows.LocalFree(secDesc)
 	}
+
+	// Pin every pointer the kernel will dereference *transitively* through
+	// entries[i].Trustee.Name. The unsafe.Pointer->uintptr pinning rule in
+	// syscall.SyscallN only pins direct arguments (&entries[0]); pointers
+	// nested inside that struct -- here, the SID or UTF-16 buffer cast to
+	// *uint16 -- are NOT covered, and the cast through a smaller type
+	// obscures the true allocation from escape analysis.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	if len(entries) > 0 {
+		pinner.Pin(&entries[0])
+	}
+	for i := range entries {
+		if entries[i].Trustee.Name != nil {
+			pinner.Pin(entries[i].Trustee.Name)
+		}
+	}
+
 	var acl windows.Handle
 	if err := SetEntriesInAcl(
 		entries,
@@ -244,6 +262,7 @@ func osWindowsApplyACL(name string, replace, inherit bool, entries ...ExplicitAc
 		return err
 	}
 	defer windows.LocalFree(acl)
+
 	var secInfo uint32
 	if !inherit {
 		secInfo = PROTECTED_DACL_SECURITY_INFORMATION
@@ -297,20 +316,6 @@ type ExplicitAccess struct {
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
 	if len(entries) == 0 {
 		return nil
-	}
-
-	// Pin every pointer the kernel will dereference *transitively* through
-	// entries[i].Trustee.Name. The unsafe.Pointer->uintptr pinning rule in
-	// syscall.SyscallN only pins direct arguments (&entries[0]); pointers
-	// nested inside that struct -- here, the SID or UTF-16 buffer cast to
-	// *uint16 -- are NOT covered, and the cast through a smaller type
-	// obscures the true allocation from escape analysis.
-	var pinner runtime.Pinner
-	defer pinner.Unpin()
-	for i := range entries {
-		if entries[i].Trustee.Name != nil {
-			pinner.Pin(entries[i].Trustee.Name)
-		}
 	}
 
 	ret, _, _ := syscall.SyscallN(
