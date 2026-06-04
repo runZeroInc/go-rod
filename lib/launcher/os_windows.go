@@ -305,7 +305,10 @@ func runICACLS(path string, args ...string) error {
 // inheritance, and finally re-enables inheritance from the parent.
 func chownByUsernameICACLS(path, username string) error {
 	if _, err := os.Stat(path); err != nil {
-		return nil
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
 	}
 	// Replace the DACL: remove inherited entries and grant a 0o755-equivalent
 	// set of permissions. /grant:r replaces existing grants for these
