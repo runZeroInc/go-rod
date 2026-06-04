@@ -216,9 +216,8 @@ func (l *Launcher) osSetupCmd(_ context.Context, cmd *exec.Cmd) error {
 }
 
 // ChownByUsername grants the named user full control of path using the raw
-// Win32 ACL APIs. Prefer (*Launcher).chownByUsername or
-// (*Browser).chownByUsername which honor the UseWinACLAPI option and default
-// to the safer icacls implementation.
+// Win32 ACL APIs. Prefer (*Launcher).chownByUsername which honors the
+// UseWinACLAPI option and defaults to the safer icacls implementation.
 func ChownByUsername(path string, username string) error {
 	_ = winacl.Chmod(path, 0o755)
 	return winacl.Apply(path, false, true,
