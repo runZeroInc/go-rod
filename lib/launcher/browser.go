@@ -311,6 +311,18 @@ type Browser struct {
 	HideWindow          bool
 	VerboseLogging      bool
 	LaunchTimeout       time.Duration
+	// UseWinACLAPI controls how Windows file permissions are applied for the
+	// browser's user data, cache, and binary directories.
+	//
+	// When false (default), the launcher shells out to the icacls command to
+	// set permissions/ownership. This avoids invoking the raw Win32 ACL APIs
+	// in-process, which has been observed to corrupt Go process memory when
+	// CrowdStrike's EDR hook intercepts those calls.
+	//
+	// When true, the launcher uses the in-process winacl API directly. This
+	// is faster and works without icacls being on PATH, but is unsafe in
+	// environments running CrowdStrike Falcon EDR.
+	UseWinACLAPI bool
 
 	workingDir        string
 	installedRevision int
@@ -505,6 +517,16 @@ func WithNoSandbox(v bool) BrowserOption {
 func WithHideWindow(v bool) BrowserOption {
 	return func(b *Browser) {
 		b.HideWindow = v
+	}
+}
+
+// WithUseWinACLAPI controls whether the launcher applies Windows file
+// permissions via the in-process winacl API (true) or by shelling out to
+// icacls (false). The default is to use icacls, which avoids triggering a
+// known CrowdStrike EDR hook that can corrupt Go process memory.
+func WithUseWinACLAPI(v bool) BrowserOption {
+	return func(b *Browser) {
+		b.UseWinACLAPI = v
 	}
 }
 
@@ -764,7 +786,7 @@ func (b *Browser) DownloadAndInstall() error {
 	b.Logger.Debugf("upgraded from revision %d to %d", b.installedRevision, b.latestRevision)
 	b.installedRevision = b.latestRevision
 
-	if err := osEnsureApplicationPermissions(b.CacheDir); err != nil {
+	if err := b.osEnsureApplicationPermissions(b.CacheDir); err != nil {
 		b.Logger.Errorf("failed to set file permissions: %v", err)
 	}
 	return nil

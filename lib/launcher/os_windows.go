@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mitchellh/go-ps"
 	"github.com/runZeroInc/go-rod/pkg/winacl"
@@ -111,7 +112,7 @@ func (l *Launcher) osEnsureUserPermissionsBinary(binPath string) error {
 	if binPath == "" {
 		return fmt.Errorf("no binary path")
 	}
-	err := GrantReadExecToPackages(binPath)
+	err := l.grantReadExecToPackages(binPath)
 	if err != nil {
 		l.logger.Errorf("grant read/exec to packages on binary %s: %v", binPath, err)
 	}
@@ -124,13 +125,13 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 	}
 
 	// Grant read/execute to LPAC
-	if err := GrantReadExecToPackages(l.Browser.TempDir); err != nil {
+	if err := l.grantReadExecToPackages(l.Browser.TempDir); err != nil {
 		l.logger.Errorf("grant read/exec to packages on temp dir %s failed: %v", l.Browser.TempDir, err)
 	}
-	if err := GrantReadExecToPackages(l.Browser.CacheDir); err != nil {
+	if err := l.grantReadExecToPackages(l.Browser.CacheDir); err != nil {
 		l.logger.Errorf("grant read/exec to packages on cache dir %s failed: %v", l.Browser.CacheDir, err)
 	}
-	if err := GrantReadExecToPackages(userDir); err != nil {
+	if err := l.grantReadExecToPackages(userDir); err != nil {
 		l.logger.Errorf("grant read/exec to packages on user dir %s failed: %v", userDir, err)
 	}
 
@@ -148,11 +149,11 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 
 	// Change the ownership to the target user account
 	var errSet error
-	if err := ChownByUsername(l.Browser.TempDir, l.osAttributes.Username); err != nil {
+	if err := l.chownByUsername(l.Browser.TempDir, l.osAttributes.Username); err != nil {
 		l.logger.Errorf("chown temp dir %q for user %s failed: %v", l.Browser.TempDir, l.osAttributes.Username, err)
 		errSet = err
 	}
-	if err := ChownByUsername(userDir, l.osAttributes.Username); err != nil {
+	if err := l.chownByUsername(userDir, l.osAttributes.Username); err != nil {
 		l.logger.Errorf("chown user dir %q for user %s failed: %v", userDir, l.osAttributes.Username, err)
 		errSet = errors.Join(errSet, err)
 	}
@@ -166,11 +167,11 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 		if err := os.MkdirAll(bpath, 0o755); err != nil { //nolint:gosec
 			l.logger.Errorf("mkdir %q for user %s failed: %v", bpath, l.osAttributes.Username, err)
 		}
-		if err := ChownByUsername(bpath, l.osAttributes.Username); err != nil {
+		if err := l.chownByUsername(bpath, l.osAttributes.Username); err != nil {
 			l.logger.Errorf("chown %q for user %s failed: %v", bpath, l.osAttributes.Username, err)
 			errSet = errors.Join(errSet, err)
 		}
-		if err := GrantReadExecToPackages(bpath); err != nil {
+		if err := l.grantReadExecToPackages(bpath); err != nil {
 			l.logger.Errorf("grant read/exec to packages on path %s failed: %v", bpath, err)
 		}
 	}
@@ -180,10 +181,10 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 
 // osEnsureApplicationPermissions enables read/execute permissions for everyone, with an explicit grant
 // for All Application Packages and All Restricted Application Packages to support LPAC.
-func osEnsureApplicationPermissions(dir string) error {
+func (b *Browser) osEnsureApplicationPermissions(dir string) error {
 	// Ignore errors setting permissions on individual files/directories
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		_ = GrantReadExecToPackages(path)
+		_ = b.grantReadExecToPackages(path)
 		return nil
 	})
 	return nil
@@ -214,6 +215,9 @@ func (l *Launcher) osSetupCmd(_ context.Context, cmd *exec.Cmd) error {
 	return err
 }
 
+// ChownByUsername grants the named user full control of path using the raw
+// Win32 ACL APIs. Prefer (*Launcher).chownByUsername which honors the
+// UseWinACLAPI option and defaults to the safer icacls implementation.
 func ChownByUsername(path string, username string) error {
 	_ = winacl.Chmod(path, 0o755)
 	return winacl.Apply(path, false, true,
@@ -222,6 +226,10 @@ func ChownByUsername(path string, username string) error {
 	)
 }
 
+// GrantReadExecToPackages grants read/execute permissions to AllApplicationPackages,
+// AllRestrictedApplicationPackages, and Everyone using the raw Win32 ACL APIs.
+// Prefer (*Launcher).grantReadExecToPackages or (*Browser).grantReadExecToPackages
+// which honor the UseWinACLAPI option and default to the safer icacls implementation.
 func GrantReadExecToPackages(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		// Skip non-existent paths
@@ -233,6 +241,119 @@ func GrantReadExecToPackages(path string) error {
 		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, RestrictedAppPackagesSID),
 		winacl.GrantSid(windows.GENERIC_READ|windows.GENERIC_EXECUTE|windows.READ_CONTROL, EveryoneSID),
 		winacl.GrantSid(windows.MAXIMUM_ALLOWED, CreatorOwnerSID),
+	)
+}
+
+// chownByUsername dispatches to either the icacls-based implementation
+// (default) or the raw Win32 API implementation when UseWinACLAPI is set.
+func (l *Launcher) chownByUsername(path, username string) error {
+	if l.Browser != nil && l.Browser.UseWinACLAPI {
+		return ChownByUsername(path, username)
+	}
+	return chownByUsernameICACLS(path, username)
+}
+
+// grantReadExecToPackages dispatches to either the icacls-based implementation
+// (default) or the raw Win32 API implementation when UseWinACLAPI is set.
+func (l *Launcher) grantReadExecToPackages(path string) error {
+	if l.Browser != nil && l.Browser.UseWinACLAPI {
+		return GrantReadExecToPackages(path)
+	}
+	return grantReadExecToPackagesICACLS(path)
+}
+
+// grantReadExecToPackages dispatches to either the icacls-based implementation
+// (default) or the raw Win32 API implementation when UseWinACLAPI is set.
+func (b *Browser) grantReadExecToPackages(path string) error {
+	if b.UseWinACLAPI {
+		return GrantReadExecToPackages(path)
+	}
+	return grantReadExecToPackagesICACLS(path)
+}
+
+// icaclsTimeout caps how long an icacls invocation is allowed to run before
+// it is killed. icacls normally completes in well under a second, but on
+// slow filesystems or contested directories it can hang; bound it so a
+// stuck invocation cannot block browser startup indefinitely.
+const icaclsTimeout = 2 * time.Minute
+
+// runICACLS executes the icacls command for path with the supplied arguments.
+// It always appends /C (continue on errors) and /Q (quiet) to keep behavior
+// closer to the in-process API which silently skips per-entry failures.
+func runICACLS(path string, args ...string) error {
+	cmdArgs := append([]string{path}, args...)
+	cmdArgs = append(cmdArgs, "/C", "/Q")
+	ctx, cancel := context.WithTimeout(context.Background(), icaclsTimeout)
+	defer cancel()
+
+	icaclsPath := "icacls"
+	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
+		p := filepath.Join(systemRoot, "System32", "icacls.exe")
+		if _, err := os.Stat(p); err == nil {
+			icaclsPath = p
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, icaclsPath, cmdArgs...)
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("icacls %v on %s timed out after %s: %s", args, path, icaclsTimeout, strings.TrimSpace(string(out)))
+	}
+	if err != nil {
+		return fmt.Errorf("icacls %v on %s failed: %w: %s", args, path, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// chownByUsernameICACLS mirrors the semantics of ChownByUsername using the
+// icacls command line tool instead of the raw Win32 ACL APIs.
+//
+// It first resets the DACL to a 0o755-equivalent (CreatorOwner full,
+// CreatorGroup read/execute, Everyone read/execute) with parent inheritance
+// removed, then grants full control to the target user with object/container
+// inheritance, and finally re-enables inheritance from the parent.
+func chownByUsernameICACLS(path, username string) error {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	// Replace the DACL: remove inherited entries and grant a 0o755-equivalent
+	// set of permissions. /grant:r replaces existing grants for these
+	// trustees rather than appending.
+	if err := runICACLS(path,
+		"/inheritance:r",
+		"/grant:r",
+		"*S-1-3-0:(OI)(CI)F",  // CreatorOwner: full
+		"*S-1-3-1:(OI)(CI)RX", // CreatorGroup: read+execute
+		"*S-1-1-0:(OI)(CI)RX", // Everyone:     read+execute
+	); err != nil {
+		return err
+	}
+	// Grant the named user full control with inheritance.
+	if err := runICACLS(path,
+		"/grant", fmt.Sprintf("%s:(OI)(CI)F", username),
+	); err != nil {
+		return err
+	}
+	// Re-enable inheritance from the parent (matches Apply(..., inherit=true)).
+	return runICACLS(path, "/inheritance:e")
+}
+
+// grantReadExecToPackagesICACLS mirrors the semantics of
+// GrantReadExecToPackages using the icacls command line tool.
+func grantReadExecToPackagesICACLS(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		// Skip non-existent paths
+		return nil
+	}
+	return runICACLS(path,
+		"/grant",
+		"*S-1-15-2-1:(OI)(CI)RX", // AllApplicationPackages
+		"*S-1-15-2-2:(OI)(CI)RX", // AllRestrictedApplicationPackages
+		"*S-1-1-0:(OI)(CI)RX",    // Everyone
+		"*S-1-3-0:(OI)(CI)F",     // CreatorOwner
 	)
 }
 
