@@ -59,18 +59,23 @@ func TestGrantReadExecToPackages_BothBackends(t *testing.T) {
 				t.Fatalf("%s: %v", tc.name, err)
 			}
 			acl := readDACL(t, dir)
-			// AllApplicationPackages SID (S-1-15-2-1) and Everyone are
-			// always rendered by icacls as friendly names; check both
-			// the friendly names and SID-form to be resilient to
-			// localization.
-			wants := []string{
-				"ALL APPLICATION PACKAGES",
-				"ALL RESTRICTED APPLICATION PACKAGES",
-				"Everyone",
+			// icacls output may be localized. Accept either the SID string or the
+			// (commonly-English) friendly name for each expected trustee.
+			wants := [][]string{
+				{"S-1-15-2-1", "ALL APPLICATION PACKAGES"},
+				{"S-1-15-2-2", "ALL RESTRICTED APPLICATION PACKAGES"},
+				{"S-1-1-0", "Everyone"},
 			}
-			for _, w := range wants {
-				if !strings.Contains(acl, w) {
-					t.Errorf("expected DACL to contain %q after %s, got:\n%s", w, tc.name, acl)
+			for _, alts := range wants {
+				matched := false
+				for _, w := range alts {
+					if strings.Contains(acl, w) {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected DACL to contain one of %q after %s, got:\n%s", alts, tc.name, acl)
 				}
 			}
 		})
