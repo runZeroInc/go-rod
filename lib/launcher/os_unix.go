@@ -191,7 +191,7 @@ func (l *Launcher) osEnsureUserPermissionsUserDir(userDir string) error {
 }
 
 // osEnsureApplicationPermissions enables read/execute permissions for everyone.
-func osEnsureApplicationPermissions(dir string) error {
+func (b *Browser) osEnsureApplicationPermissions(dir string) error {
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		_ = os.Chmod(path, 0o755) //nolint:gosec
 		return nil

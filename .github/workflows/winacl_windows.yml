@@ -10,6 +10,8 @@ on:
       - 'pkg/winacl/**'
       - 'pkg/winaclx/**'
       - 'lib/launcher/os_windows.go'
+      - 'lib/launcher/os_windows_acl_test.go'
+      - 'lib/launcher/browser.go'
       - '.github/workflows/winacl_windows.yml'
 
 jobs:
@@ -35,6 +37,15 @@ jobs:
 
       - name: Run winacl unit tests
         run: go test -v -count=1 ./pkg/winacl/... ./pkg/winaclx/...
+
+      # Exercises both the icacls-based and raw Win32 ACL code paths in the
+      # launcher to ensure the UseWinACLAPI flag dispatches correctly and
+      # both backends produce equivalent ACLs on a real filesystem.
+      - name: Run launcher ACL backend tests (icacls + winapi)
+        run: >-
+          go test -v -count=1
+          -run "TestGrantReadExecToPackages_BothBackends|TestChownByUsername_BothBackends|TestLauncherDispatch_UseWinACLAPI|TestRunICACLS_NonexistentPath|TestGrantReadExecToPackagesICACLS_MissingPathIsNoop"
+          ./lib/launcher/...
 
       # Stress test specifically targets the runtime.Pinner fix in
       # SetEntriesInAcl. With checkptr=2 and aggressive GC, an unpinned
