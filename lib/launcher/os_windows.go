@@ -285,7 +285,16 @@ func runICACLS(path string, args ...string) error {
 	cmdArgs = append(cmdArgs, "/C", "/Q")
 	ctx, cancel := context.WithTimeout(context.Background(), icaclsTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "icacls", cmdArgs...)
+
+	icaclsPath := "icacls"
+	if systemRoot := os.Getenv("SystemRoot"); systemRoot != "" {
+		p := filepath.Join(systemRoot, "System32", "icacls.exe")
+		if _, err := os.Stat(p); err == nil {
+			icaclsPath = p
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, icaclsPath, cmdArgs...)
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("icacls %v on %s timed out after %s: %s", args, path, icaclsTimeout, strings.TrimSpace(string(out)))
