@@ -44,7 +44,7 @@ jobs:
       - name: Run launcher ACL backend tests (icacls + winapi)
         run: >-
           go test -v -count=1
-          -run "TestGrantReadExecToPackages_BothBackends|TestChownByUsername_BothBackends|TestLauncherDispatch_UseWinACLAPI|TestRunICACLS_NonexistentPath|TestGrantReadExecToPackagesICACLS_MissingPathIsNoop"
+          -run "TestGrantReadExecToPackages_BothBackends|TestChownByUsername_BothBackends|TestLauncherDispatch_UseWinACLAPI|TestRunICACLS_OnNonexistentPath|TestGrantReadExecToPackagesICACLS_MissingPathIsNoop"
           ./lib/launcher/...
 
       # Stress test specifically targets the runtime.Pinner fix in
