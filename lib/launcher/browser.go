@@ -22,7 +22,7 @@ import (
 )
 
 /*
-	Google's Chromium-for-Testing (CfT) project provides builds for macOS (Intel and ARM), Windows (x86 and x64), and Linux (x64):
+	Google's Chromium-for-Testing (CfT) project provides builds for macOS (Intel and ARM), Windows (x86, x64, and ARM64), and Linux (x64):
 	- https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json
 
 	Playwright offers Chromium builds for Linux on ARM:
@@ -150,8 +150,9 @@ func ResolveChromiumForTestingPlatform(os string, arch string) string {
 		}
 	case "windows":
 		switch arch {
-		case "amd64",
-			"arm64": // Windows ARM64 uses the x86_64 binary via emulation
+		case "arm64": // Windows 11 ARM64 has native Chrome-for-Testing builds
+			return "win-arm64"
+		case "amd64":
 			return "win64"
 		case "386":
 			return "win32"
@@ -226,10 +227,6 @@ func ResolveLatestDownloadURLWithCache(os string, arch string) (string, string, 
 // resolveLatestDownloadURL fetches the latest Chromium download URL for the specified OS and architecture.
 // It returns an error if the platform is unsupported or if there are issues fetching or parsing the metadata.
 func resolveLatestDownloadURL(os string, arch string) (string, string, error) {
-	// Microsoft's Playwright does not support Windows ARM64 and falls back to emulation using Win64
-	if os == "windows" && arch == "arm64" {
-		arch = "amd64"
-	}
 	// First try Google Chromium-for-Testing for common platforms
 	if cftPlatform := ResolveChromiumForTestingPlatform(os, arch); cftPlatform != "" {
 		var latestJSON GoogleCFTLatestDownloadsMeta
@@ -237,9 +234,19 @@ func resolveLatestDownloadURL(os string, arch string) (string, string, error) {
 			return "", "", err
 		}
 		stable := latestJSON.Channels.Stable
-		for _, download := range stable.Downloads.Chrome {
-			if download.Platform == cftPlatform {
-				return download.URL, stable.Revision, nil
+
+		// Prefer the native platform build, but on Windows ARM64 fall back to
+		// the x86_64 (win64) build via emulation when Chromium-for-Testing does
+		// not publish a native win-arm64 build for the stable channel.
+		candidatePlatforms := []string{cftPlatform}
+		if os == "windows" && arch == "arm64" {
+			candidatePlatforms = append(candidatePlatforms, "win64")
+		}
+		for _, platform := range candidatePlatforms {
+			for _, download := range stable.Downloads.Chrome {
+				if download.Platform == platform {
+					return download.URL, stable.Revision, nil
+				}
 			}
 		}
 	}

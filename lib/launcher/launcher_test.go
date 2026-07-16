@@ -247,6 +247,16 @@ func Test_ResolveDownloadURL(t *testing.T) {
 			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/win64/chrome-win64.zip`),
 		},
 		{
+			name: "windows-arm64",
+			platform: srcPlatform{
+				os:   "windows",
+				arch: "arm64",
+			},
+			// Prefer the native win-arm64 build, but accept the win64 build
+			// when Chromium-for-Testing has not published a native build.
+			wantMatch: regexp.MustCompile(`https://storage.googleapis.com/chrome-for-testing-public/[\d.]+/win(-arm64|64)/chrome-win(-arm64|64).zip`),
+		},
+		{
 			name: "windows-x86",
 			platform: srcPlatform{
 				os:   "windows",
@@ -286,6 +296,30 @@ func Test_ResolveDownloadURL(t *testing.T) {
 			}
 			if v <= 0 {
 				t.Errorf("ResolveLatestDownloadURL() revision = %v, want a positive integer", rev)
+			}
+		})
+	}
+}
+
+func Test_ResolveChromiumForTestingPlatform(t *testing.T) {
+	tests := []struct {
+		name string
+		os   string
+		arch string
+		want string
+	}{
+		{name: "windows-arm64", os: "windows", arch: "arm64", want: "win-arm64"},
+		{name: "windows-amd64", os: "windows", arch: "amd64", want: "win64"},
+		{name: "windows-386", os: "windows", arch: "386", want: "win32"},
+		{name: "darwin-arm64", os: "darwin", arch: "arm64", want: "mac-arm64"},
+		{name: "darwin-amd64", os: "darwin", arch: "amd64", want: "mac-x64"},
+		{name: "linux-amd64", os: "linux", arch: "amd64", want: "linux64"},
+		{name: "linux-arm64", os: "linux", arch: "arm64", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := launcher.ResolveChromiumForTestingPlatform(tt.os, tt.arch); got != tt.want {
+				t.Errorf("ResolveChromiumForTestingPlatform(%q, %q) = %q, want %q", tt.os, tt.arch, got, tt.want)
 			}
 		})
 	}
