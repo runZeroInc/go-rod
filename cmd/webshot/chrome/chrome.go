@@ -64,16 +64,19 @@ type WebshotStats struct {
 
 // Webshot struct wraps a chromium instance used for screenshots
 type Webshot struct {
-	ChromiumPath         string
-	TempDir              string
-	Timeout              time.Duration
-	Width                int
-	Height               int
-	DeviceScaleFactor    float64
-	Fullpage             bool
-	MinCaptures          int
-	MaxCaptures          int
-	Proxy                string
+	ChromiumPath      string
+	TempDir           string
+	Timeout           time.Duration
+	Width             int
+	Height            int
+	DeviceScaleFactor float64
+	Fullpage          bool
+	MinCaptures       int
+	MaxCaptures       int
+	// Proxy is Chrome's --proxy-server. See WithProxy.
+	Proxy string
+	// ProxyBypassList is Chrome's --proxy-bypass-list. See WithProxyBypassList.
+	ProxyBypassList      string
 	LaunchedChromiumPath string
 	LaunchedVersion      string
 	LaunchedError        error
@@ -177,6 +180,26 @@ func WithUserAgent(ua string) WebshotOption {
 func WithUseChromiumPath(chromiumPath string) WebshotOption {
 	return func(w *Webshot) {
 		w.ChromiumPath = chromiumPath
+	}
+}
+
+// WithProxy routes the browser's traffic through host ("127.0.0.1:8899", "http://...").
+//
+// Pair it with WithProxyBypassList("<-loopback>") when the proxy is a security boundary. Chrome
+// exempts loopback and link-local from a proxy by default, so a proxy set on its own still lets a
+// page reach 127.0.0.1 and 169.254.169.254 directly -- the two destinations such a proxy most
+// likely exists to refuse.
+func WithProxy(host string) WebshotOption {
+	return func(w *Webshot) {
+		w.Proxy = host
+	}
+}
+
+// WithProxyBypassList sets Chrome's --proxy-bypass-list. "<-loopback>" subtracts the implicit
+// loopback and link-local exemptions; see WithProxy.
+func WithProxyBypassList(list string) WebshotOption {
+	return func(w *Webshot) {
+		w.ProxyBypassList = list
 	}
 }
 
@@ -291,6 +314,19 @@ func (w *Webshot) Init() error {
 
 	if chromiumPath := os.Getenv("WEBSHOT_CHROMIUM_PATH"); chromiumPath != "" {
 		opts = append(opts, launcher.WithUseChromiumPath(chromiumPath))
+	}
+
+	// Proxy has been a field on Webshot since before this option list existed, and nothing read it:
+	// the launcher took its proxy only from the process-global defaults.Proxy, so setting
+	// Webshot.Proxy did nothing at all. Forward it, along with the bypass list, because a caller
+	// pointing the browser at hosts it does not trust needs the proxy to be a fence rather than a
+	// hint -- and Chrome exempts loopback and link-local from a proxy unless the bypass list
+	// explicitly subtracts them, which is exactly where such a caller is being attacked.
+	if w.Proxy != "" {
+		opts = append(opts, launcher.WithProxy(w.Proxy))
+	}
+	if w.ProxyBypassList != "" {
+		opts = append(opts, launcher.WithProxyBypassList(w.ProxyBypassList))
 	}
 
 	launchAttempts := 0

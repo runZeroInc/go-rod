@@ -27,6 +27,12 @@ const (
 	// NoSandbox flag.
 	NoSandbox Flag = "no-sandbox"
 
+	// ProxyBypassList flag. Chrome exempts loopback and link-local addresses from any configured
+	// proxy unless this list subtracts them with the "<-loopback>" token, so a proxy meant to
+	// FENCE the browser -- rather than merely route it -- has to set this or it never sees a
+	// request to 127.0.0.1 or to 169.254.169.254.
+	ProxyBypassList Flag = "proxy-bypass-list"
+
 	// ProxyServer flag.
 	ProxyServer Flag = "proxy-server"
 

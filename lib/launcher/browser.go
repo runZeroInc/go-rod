@@ -308,9 +308,19 @@ type Browser struct {
 	UID                 int
 	GID                 int
 	NoSandbox           bool
-	HideWindow          bool
-	VerboseLogging      bool
-	LaunchTimeout       time.Duration
+	// Proxy is Chrome's --proxy-server for THIS launch. Empty falls back to defaults.Proxy, the
+	// process-global that go-rod reads from the ROD environment variable.
+	//
+	// It exists because the global cannot express a per-launch fence: it is read at launch time,
+	// so two browsers started concurrently see whichever value was set last, and a caller whose
+	// proxy IS the security boundary cannot accept that.
+	Proxy string
+	// ProxyBypassList is Chrome's --proxy-bypass-list. Empty leaves Chrome's implicit bypasses in
+	// place; "<-loopback>" removes them, which is what a filtering proxy needs.
+	ProxyBypassList string
+	HideWindow      bool
+	VerboseLogging  bool
+	LaunchTimeout   time.Duration
 	// UseWinACLAPI controls how Windows file permissions are applied for the
 	// browser's user data, cache, and binary directories.
 	//
@@ -505,6 +515,23 @@ func WithUID(id int) BrowserOption {
 func WithGID(id int) BrowserOption {
 	return func(b *Browser) {
 		b.GID = id
+	}
+}
+
+// WithProxy sets Chrome's --proxy-server for this launch, in preference to the process-global
+// defaults.Proxy. Use it whenever the proxy is a security boundary rather than a convenience:
+// the global is read at launch and so cannot be trusted to still hold your value.
+func WithProxy(v string) BrowserOption {
+	return func(b *Browser) {
+		b.Proxy = v
+	}
+}
+
+// WithProxyBypassList sets Chrome's --proxy-bypass-list. Pass "<-loopback>" to subtract the
+// implicit loopback and link-local exemptions so a proxy can see (and refuse) those requests.
+func WithProxyBypassList(v string) BrowserOption {
+	return func(b *Browser) {
+		b.ProxyBypassList = v
 	}
 }
 
