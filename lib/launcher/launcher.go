@@ -278,8 +278,20 @@ func GetExecFlags(conf *Browser) map[flags.Flag][]string {
 	if inContainer || conf.NoSandbox || (runtime.GOOS == "linux" && os.Geteuid() == 0 && conf.UID == 0) {
 		execFlags[flags.NoSandbox] = nil
 	}
-	if defaults.Proxy != "" {
-		execFlags[flags.ProxyServer] = []string{defaults.Proxy}
+	// conf.Proxy is this launch's own setting; defaults.Proxy is the process-global one go-rod
+	// parses out of the ROD environment variable. The explicit setting wins, so a caller running
+	// two browsers behind different proxies does not have to mutate process state to do it — which
+	// it cannot do safely anyway, since the global is read here, at launch, from whichever
+	// goroutine gets there first.
+	proxy := conf.Proxy
+	if proxy == "" {
+		proxy = defaults.Proxy
+	}
+	if proxy != "" {
+		execFlags[flags.ProxyServer] = []string{proxy}
+	}
+	if conf.ProxyBypassList != "" {
+		execFlags[flags.ProxyBypassList] = []string{conf.ProxyBypassList}
 	}
 
 	if conf.WindowWidth != 0 && conf.WindowHeight != 0 {
